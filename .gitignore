@@ -37,3 +37,4 @@ __pycache__/
 
 # TFLite source models (download with --download flag)
 Resources/DTLN_AEC/*.tflite
+.serena/

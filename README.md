@@ -89,6 +89,28 @@ Tested on Apple M1 (8-core CPU, 8-core Neural Engine):
 Real-time requirement: <8ms per frame
 ```
 
+## Benchmarking
+
+Run the included benchmark to measure performance on your hardware:
+
+```bash
+# Default: 125 frames (1 second of audio)
+swift run dtln-benchmark
+
+# More iterations for accurate results
+swift run dtln-benchmark -n 1000
+
+# JSON output for CI/scripts
+swift run dtln-benchmark --json
+```
+
+Sample output on Apple M1:
+```
+| Model | Params | Load    | Avg     | P99     | RT Ratio | Status |
+|-------|--------|---------|---------|---------|----------|--------|
+| 128   | 1.8M   |   474ms |  0.74ms |  1.95ms |   0.09x  | ✅     |
+```
+
 ## Converting Your Own Models
 
 The included models are converted from the original TFLite weights. To convert different model sizes:

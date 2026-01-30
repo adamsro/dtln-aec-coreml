@@ -13,7 +13,11 @@ let package = Package(
     .library(
       name: "DTLNAecCoreML",
       targets: ["DTLNAecCoreML"]
-    )
+    ),
+    .executable(
+      name: "dtln-benchmark",
+      targets: ["DTLNBenchmark"]
+    ),
   ],
   targets: [
     .target(
@@ -21,7 +25,13 @@ let package = Package(
       resources: [
         .copy("Resources/DTLN_AEC_128_Part1.mlpackage"),
         .copy("Resources/DTLN_AEC_128_Part2.mlpackage"),
+        .copy("Resources/DTLN_AEC_512_Part1.mlpackage"),
+        .copy("Resources/DTLN_AEC_512_Part2.mlpackage"),
       ]
+    ),
+    .executableTarget(
+      name: "DTLNBenchmark",
+      dependencies: ["DTLNAecCoreML"]
     ),
     .testTarget(
       name: "DTLNAecCoreMLTests",
