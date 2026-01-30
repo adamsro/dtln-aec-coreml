@@ -22,12 +22,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
-.venv-*/
+.venv*/
 *.egg-info/
 
 # IDEs
 .vscode/
 .idea/
+
+# Claude Code
+.claude/
 
 # Temporary files
 *.tmp
