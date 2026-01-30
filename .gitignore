@@ -1,0 +1,39 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Python (for conversion script)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv-*/
+*.egg-info/
+
+# IDEs
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.log
+
+# TFLite source models (download with --download flag)
+Resources/DTLN_AEC/*.tflite
