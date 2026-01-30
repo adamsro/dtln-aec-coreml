@@ -1,0 +1,224 @@
+# API Reference
+
+Complete API documentation for DTLN-aec CoreML.
+
+## DTLNAecEchoProcessor
+
+The main class for echo cancellation processing.
+
+### Initialization
+
+```swift
+// Using model size directly
+let processor = DTLNAecEchoProcessor(modelSize: .small)
+
+// Using configuration object
+let config = DTLNAecConfig(
+    modelSize: .large,
+    computeUnits: .cpuAndNeuralEngine,
+    enablePerformanceTracking: true
+)
+let processor = DTLNAecEchoProcessor(config: config)
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `config` | `DTLNAecConfig` | The configuration used by this processor |
+| `modelSize` | `DTLNAecModelSize` | The model size being used |
+| `numUnits` | `Int` | Number of LSTM units (128, 256, or 512) |
+| `isInitialized` | `Bool` | Whether models are loaded and ready |
+| `averageFrameTimeMs` | `Double` | Average processing time per frame |
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `sampleRate` | 16,000.0 | Required audio sample rate (Hz) |
+| `blockLen` | 512 | FFT block size (samples) |
+| `blockShift` | 128 | Frame shift (samples) |
+| `fftBins` | 257 | Number of frequency bins |
+
+### Methods
+
+#### loadModels()
+
+```swift
+func loadModels() throws
+```
+
+Loads CoreML models from the bundle. Call once at startup.
+
+**Throws:** `DTLNAecError.modelNotFound` if models aren't in the bundle.
+
+#### loadModelsAsync()
+
+```swift
+@available(macOS 10.15, iOS 13.0, *)
+func loadModelsAsync() async throws
+```
+
+Asynchronously loads models without blocking the main thread.
+
+#### feedFarEnd(_:)
+
+```swift
+func feedFarEnd(_ samples: [Float])
+```
+
+Feeds far-end (speaker/loopback) audio samples. Call before `processNearEnd`.
+
+**Parameters:**
+- `samples`: Audio samples at 16kHz, Float32 format
+
+#### processNearEnd(_:)
+
+```swift
+func processNearEnd(_ samples: [Float]) -> [Float]
+```
+
+Processes near-end (microphone) samples and returns echo-cancelled output.
+
+**Parameters:**
+- `samples`: Microphone audio at 16kHz, Float32 format
+
+**Returns:** Echo-cancelled audio samples. May be fewer samples than input due to buffering.
+
+#### resetStates()
+
+```swift
+func resetStates()
+```
+
+Resets LSTM states and clears buffers. Call when starting a new recording session.
+
+---
+
+## DTLNAecConfig
+
+Configuration options for the echo processor.
+
+```swift
+public struct DTLNAecConfig: Sendable {
+    var modelSize: DTLNAecModelSize
+    var computeUnits: MLComputeUnits
+    var enablePerformanceTracking: Bool
+}
+```
+
+### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `modelSize` | `DTLNAecModelSize` | `.small` | Model variant to use |
+| `computeUnits` | `MLComputeUnits` | `.cpuAndNeuralEngine` | CoreML compute units |
+| `enablePerformanceTracking` | `Bool` | `true` | Track `averageFrameTimeMs` |
+
+### Compute Units
+
+| Value | Description |
+|-------|-------------|
+| `.cpuOnly` | CPU only, most compatible |
+| `.cpuAndGPU` | CPU and GPU |
+| `.cpuAndNeuralEngine` | CPU and Neural Engine (recommended) |
+| `.all` | All available compute units |
+
+---
+
+## DTLNAecModelSize
+
+Available model sizes.
+
+```swift
+public enum DTLNAecModelSize: Int, CaseIterable, Sendable {
+    case small = 128   // 1.8M params, ~0.8ms/frame
+    case medium = 256  // 3.9M params, ~0.9ms/frame
+    case large = 512   // 10.4M params, ~1.4ms/frame
+}
+```
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `units` | `Int` | Number of LSTM units (raw value) |
+| `estimatedSizeMB` | `Double` | Approximate model file size |
+
+---
+
+## DTLNAecError
+
+Errors that can occur during processing.
+
+```swift
+public enum DTLNAecError: Error, LocalizedError {
+    case modelNotFound(String)
+    case initializationFailed(String)
+    case inferenceFailed(String)
+}
+```
+
+### Cases
+
+| Case | Description |
+|------|-------------|
+| `modelNotFound(name)` | Model file not found in bundle |
+| `initializationFailed(reason)` | Failed to initialize processor |
+| `inferenceFailed(reason)` | Model inference failed |
+
+---
+
+## Thread Safety
+
+`DTLNAecEchoProcessor` is **NOT thread-safe**. Call all methods from a single thread or serial dispatch queue.
+
+Example using a serial queue:
+
+```swift
+let processingQueue = DispatchQueue(label: "com.app.echo-processing")
+
+processingQueue.async {
+    processor.feedFarEnd(speakerSamples)
+    let clean = processor.processNearEnd(micSamples)
+    // Use clean audio...
+}
+```
+
+---
+
+## Usage Example
+
+```swift
+import DTLNAecCoreML
+
+class AudioProcessor {
+    private let echoProcessor: DTLNAecEchoProcessor
+    private let processingQueue = DispatchQueue(label: "echo-processing")
+
+    init() {
+        var config = DTLNAecConfig()
+        config.modelSize = .small
+        config.enablePerformanceTracking = true
+
+        echoProcessor = DTLNAecEchoProcessor(config: config)
+    }
+
+    func start() async throws {
+        try await echoProcessor.loadModelsAsync()
+    }
+
+    func processAudio(mic: [Float], speaker: [Float]) -> [Float] {
+        processingQueue.sync {
+            echoProcessor.feedFarEnd(speaker)
+            return echoProcessor.processNearEnd(mic)
+        }
+    }
+
+    func reset() {
+        processingQueue.sync {
+            echoProcessor.resetStates()
+        }
+    }
+}
+```

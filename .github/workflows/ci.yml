@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build (macOS)
+        run: swift build -v
+
+      - name: Run tests
+        run: swift test -v
+
+      - name: Build for iOS
+        run: |
+          xcodebuild build \
+            -scheme DTLNAecCoreML \
+            -destination 'generic/platform=iOS' \
+            -skipPackagePluginValidation
+
+  swift-format:
+    name: Swift Format Check
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Install swift-format
+        run: brew install swift-format
+
+      - name: Check formatting
+        run: |
+          swift-format lint --recursive Sources Tests \
+            --configuration .swift-format \
+            2>&1 | tee format-output.txt
+          if grep -q "warning:" format-output.txt; then
+            echo "::warning::Swift formatting issues found"
+          fi
+
+  validate-models:
+    name: Validate Model Files
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check model files exist
+        run: |
+          echo "Checking for CoreML model packages..."
+
+          # Currently bundled: 128-unit (small) and 512-unit (large) models
+          # 256-unit (medium) model requires manual conversion - see Scripts/convert_dtln_aec_to_coreml.py
+          models=(
+            "Sources/DTLNAecCoreML/Resources/DTLN_AEC_128_Part1.mlpackage"
+            "Sources/DTLNAecCoreML/Resources/DTLN_AEC_128_Part2.mlpackage"
+            "Sources/DTLNAecCoreML/Resources/DTLN_AEC_512_Part1.mlpackage"
+            "Sources/DTLNAecCoreML/Resources/DTLN_AEC_512_Part2.mlpackage"
+          )
+
+          missing=0
+          for model in "${models[@]}"; do
+            if [ -d "$model" ]; then
+              echo "✓ Found: $model"
+              # Verify manifest exists
+              if [ -f "$model/Manifest.json" ]; then
+                echo "  ✓ Manifest.json present"
+              else
+                echo "  ✗ Missing Manifest.json"
+                missing=1
+              fi
+            else
+              echo "✗ Missing: $model"
+              missing=1
+            fi
+          done
+
+          if [ $missing -eq 1 ]; then
+            echo ""
+            echo "::error::Some model files are missing or incomplete"
+            exit 1
+          fi
+
+          echo ""
+          echo "All model files validated successfully!"
+
+  benchmark:
+    name: Run Benchmarks
+    runs-on: macos-14
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Build release
+        run: swift build -c release
+
+      - name: Run benchmark
+        run: |
+          echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          swift run -c release dtln-benchmark -n 100 --json | tee benchmark.json
+
+          # Add results to summary
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          cat benchmark.json >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark.json

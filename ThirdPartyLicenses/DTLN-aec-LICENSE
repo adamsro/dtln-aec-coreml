@@ -1,0 +1,43 @@
+DTLN-aec - Dual-Signal Transformation LSTM Network for Acoustic Echo Cancellation
+==================================================================================
+
+Repository: https://github.com/breizhn/DTLN-aec
+Author: Nils L. Westhausen
+
+MIT License
+
+Copyright (c) 2021 Nils L. Westhausen
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+Citation:
+If you use DTLN-aec in your research, please cite:
+
+@inproceedings{westhausen2021acoustic,
+    title={Acoustic Echo Cancellation with the Dual-Signal Transformation LSTM Network},
+    author={Westhausen, Nils L and Meyer, Bernd T},
+    booktitle={ICASSP 2021-2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+    pages={7138--7142},
+    year={2021},
+    organization={IEEE}
+}
+
+This model placed 3rd in the Microsoft AEC Challenge 2021.

@@ -7,8 +7,9 @@ This package provides a Swift wrapper for [DTLN-aec](https://github.com/breizhn/
 ## Features
 
 - Real-time echo cancellation on Apple Silicon (~0.8ms per 8ms frame on M1)
-- Three model sizes: 128, 256, or 512 LSTM units
-- Pure Swift implementation with Accelerate framework for FFT
+- Two model sizes: 128 units (small) and 512 units (large)
+- Modern Swift API with async/await support
+- Configurable compute units (CPU, GPU, Neural Engine)
 - iOS 16+ and macOS 13+ support
 
 ## Installation
@@ -25,26 +26,41 @@ dependencies: [
 
 Or in Xcode: File → Add Package Dependencies → Enter the repository URL.
 
-## Usage
+## Quick Start
 
 ```swift
 import DTLNAecCoreML
 
-// Initialize processor (use .small for best latency, .large for best quality)
+// Initialize processor
 let processor = DTLNAecEchoProcessor(modelSize: .small)
 
 // Load CoreML models (do this once at startup)
 try processor.loadModels()
 
 // During audio processing:
-// 1. Feed far-end (system/speaker) audio as reference
 processor.feedFarEnd(systemAudioSamples)  // [Float] at 16kHz
-
-// 2. Process near-end (microphone) audio
-let cleanAudio = processor.processNearEnd(microphoneSamples)  // Returns echo-cancelled audio
+let cleanAudio = processor.processNearEnd(microphoneSamples)
 
 // Reset when starting a new session
 processor.resetStates()
+```
+
+### Async Model Loading
+
+```swift
+let processor = DTLNAecEchoProcessor(modelSize: .small)
+try await processor.loadModelsAsync()  // Non-blocking
+```
+
+### Configuration Options
+
+```swift
+var config = DTLNAecConfig()
+config.modelSize = .large                    // Best quality
+config.computeUnits = .cpuAndNeuralEngine   // Use Neural Engine
+config.enablePerformanceTracking = true
+
+let processor = DTLNAecEchoProcessor(config: config)
 ```
 
 ## Model Sizes
@@ -52,7 +68,6 @@ processor.resetStates()
 | Model | Units | Parameters | Size | Latency (M1) | Use Case |
 |-------|-------|------------|------|--------------|----------|
 | `.small` | 128 | 1.8M | 3.6 MB | 0.76ms | Production (recommended) |
-| `.medium` | 256 | 3.9M | 8.0 MB | 0.93ms | Higher quality |
 | `.large` | 512 | 10.4M | 20.3 MB | 1.43ms | Maximum quality |
 
 All models run well within real-time requirements (8ms per frame).
@@ -65,73 +80,50 @@ All models run well within real-time requirements (8ms per frame).
 
 If your audio is at a different sample rate, resample before processing.
 
-## How It Works
+## Documentation
 
-DTLN-aec uses a two-part architecture:
-
-1. **Part 1 (Frequency Domain):** Takes magnitude spectra of mic and loopback signals, generates a frequency mask using LSTM layers, removes echo in frequency domain
-
-2. **Part 2 (Time Domain):** Refines the output using learned time-domain representations with Conv1D encoders and LSTM layers
-
-Both parts maintain LSTM state across frames to capture temporal context.
-
-## Benchmarks
-
-Tested on Apple M1 (8-core CPU, 8-core Neural Engine):
-
-```
-| Model | Avg Frame | RT Ratio | Status |
-|-------|-----------|----------|--------|
-| 128   | 0.76ms    | 0.09x    | ✅     |
-| 256   | 0.93ms    | 0.12x    | ✅     |
-| 512   | 1.43ms    | 0.18x    | ✅     |
-
-Real-time requirement: <8ms per frame
-```
+- [Getting Started](Documentation/GettingStarted.md) - Installation and basic usage
+- [Audio Requirements](Documentation/AudioRequirements.md) - Sample rates, formats, buffering
+- [API Reference](Documentation/API.md) - Complete API documentation
+- [Benchmarking](Documentation/Benchmarking.md) - Measure performance
+- [Model Conversion](Documentation/ModelConversion.md) - Convert custom models
 
 ## Benchmarking
 
 Run the included benchmark to measure performance on your hardware:
 
 ```bash
-# Default: 125 frames (1 second of audio)
-swift run dtln-benchmark
-
-# More iterations for accurate results
-swift run dtln-benchmark -n 1000
-
-# JSON output for CI/scripts
-swift run dtln-benchmark --json
+swift run dtln-benchmark        # Basic benchmark
+swift run dtln-benchmark -n 1000  # More iterations
+swift run dtln-benchmark --json   # JSON output for CI
 ```
 
 Sample output on Apple M1:
+
 ```
 | Model | Params | Load    | Avg     | P99     | RT Ratio | Status |
 |-------|--------|---------|---------|---------|----------|--------|
-| 128   | 1.8M   |   474ms |  0.74ms |  1.95ms |   0.09x  | ✅     |
+| 128   | 1.8M   |   474ms |  0.76ms |  1.95ms |   0.09x  | ✅     |
+| 512   | 10.4M  |   687ms |  1.43ms |  2.91ms |   0.18x  | ✅     |
 ```
 
-## Converting Your Own Models
+## How It Works
 
-The included models are converted from the original TFLite weights. To convert different model sizes:
+DTLN-aec uses a two-part architecture:
 
-```bash
-# Download TFLite models from DTLN-aec repo
-python3 Scripts/convert_dtln_aec_to_coreml.py --download --size 256
+1. **Part 1 (Frequency Domain):** Takes magnitude spectra of mic and loopback signals, generates a frequency mask using LSTM layers
 
-# Convert to CoreML (requires TensorFlow 2.12+)
-pip install tensorflow coremltools
-python3 Scripts/convert_dtln_aec_to_coreml.py --convert --size 256
-```
+2. **Part 2 (Time Domain):** Refines the output using learned time-domain representations with Conv1D encoders and LSTM layers
+
+Both parts maintain LSTM state across frames to capture temporal context.
 
 ## Credits
 
 - **DTLN-aec:** [Nils L. Westhausen](https://github.com/breizhn/DTLN-aec) - Original TensorFlow implementation
 - **Microsoft AEC Challenge 2021:** Competition where DTLN-aec placed 3rd
-- **CoreML Conversion:** This package
 
 ## License
 
-MIT License - see LICENSE file.
+MIT License - see [LICENSE](LICENSE) file.
 
-The original DTLN-aec model weights are provided under MIT License by Nils L. Westhausen.
+The original DTLN-aec model weights are provided under MIT License by Nils L. Westhausen. See [ThirdPartyLicenses/](ThirdPartyLicenses/) for details.

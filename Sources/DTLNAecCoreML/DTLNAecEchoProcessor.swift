@@ -24,6 +24,46 @@ import os.log
 
 private let logger = Logger(subsystem: "DTLNAecCoreML", category: "EchoProcessor")
 
+// MARK: - Configuration
+
+/// Configuration options for DTLN-aec echo processor.
+///
+/// Use this struct to customize model loading and processing behavior.
+///
+/// ## Example
+/// ```swift
+/// var config = DTLNAecConfig()
+/// config.modelSize = .large
+/// config.computeUnits = .cpuAndNeuralEngine
+/// config.enablePerformanceTracking = true
+///
+/// let processor = DTLNAecEchoProcessor(config: config)
+/// try await processor.loadModelsAsync()
+/// ```
+public struct DTLNAecConfig: Sendable {
+  /// The model size to use (default: .small for best latency)
+  public var modelSize: DTLNAecModelSize
+
+  /// CoreML compute units to use for inference (default: .cpuAndNeuralEngine)
+  public var computeUnits: MLComputeUnits
+
+  /// Whether to track performance metrics like average frame time (default: true)
+  public var enablePerformanceTracking: Bool
+
+  /// Creates a configuration with default settings.
+  public init(
+    modelSize: DTLNAecModelSize = .small,
+    computeUnits: MLComputeUnits = .cpuAndNeuralEngine,
+    enablePerformanceTracking: Bool = true
+  ) {
+    self.modelSize = modelSize
+    self.computeUnits = computeUnits
+    self.enablePerformanceTracking = enablePerformanceTracking
+  }
+}
+
+// MARK: - Model Size
+
 /// Available DTLN-aec model sizes.
 /// Larger models have better quality but higher latency.
 public enum DTLNAecModelSize: Int, CaseIterable, Sendable {
@@ -81,11 +121,14 @@ public final class DTLNAecEchoProcessor {
 
   // MARK: - Model Configuration
 
+  /// The configuration used by this processor
+  public let config: DTLNAecConfig
+
   /// The model size being used
-  public let modelSize: DTLNAecModelSize
+  public var modelSize: DTLNAecModelSize { config.modelSize }
 
   /// Number of LSTM units per layer (from model size)
-  public var numUnits: Int { modelSize.units }
+  public var numUnits: Int { config.modelSize.units }
 
   // MARK: - CoreML Models
 
@@ -129,16 +172,22 @@ public final class DTLNAecEchoProcessor {
     modelPart1 != nil && modelPart2 != nil
   }
 
-  /// Initialize with specified model size.
-  /// - Parameter modelSize: The DTLN-aec model variant to use (default: .small = 128 units)
-  public init(modelSize: DTLNAecModelSize = .small) {
-    self.modelSize = modelSize
+  /// Initialize with specified configuration.
+  /// - Parameter config: The configuration for this processor
+  public init(config: DTLNAecConfig) {
+    self.config = config
     outputBuffer = [Float](repeating: 0, count: Self.blockLen)
     window = [Float](repeating: 0, count: Self.blockLen)
     vDSP_hann_window(&window, vDSP_Length(Self.blockLen), Int32(vDSP_HANN_NORM))
     fftRealBuffer = [Float](repeating: 0, count: Self.blockLen)
     fftImagBuffer = [Float](repeating: 0, count: Self.blockLen)
     fftSetup = vDSP.FFT(log2n: 9, radix: .radix2, ofType: DSPSplitComplex.self)
+  }
+
+  /// Initialize with specified model size using default configuration.
+  /// - Parameter modelSize: The DTLN-aec model variant to use (default: .small = 128 units)
+  public convenience init(modelSize: DTLNAecModelSize = .small) {
+    self.init(config: DTLNAecConfig(modelSize: modelSize))
   }
 
   /// Load CoreML models from bundle.
@@ -158,11 +207,11 @@ public final class DTLNAecEchoProcessor {
       throw DTLNAecError.modelNotFound(part2Name)
     }
 
-    let config = MLModelConfiguration()
-    config.computeUnits = .cpuAndNeuralEngine
+    let mlConfig = MLModelConfiguration()
+    mlConfig.computeUnits = config.computeUnits
 
-    modelPart1 = try MLModel(contentsOf: part1URL, configuration: config)
-    modelPart2 = try MLModel(contentsOf: part2URL, configuration: config)
+    modelPart1 = try MLModel(contentsOf: part1URL, configuration: mlConfig)
+    modelPart2 = try MLModel(contentsOf: part2URL, configuration: mlConfig)
 
     try initializeStates()
     try preallocateArrays()
@@ -171,6 +220,23 @@ public final class DTLNAecEchoProcessor {
     logger.info(
       "DTLN-aec \(self.modelSize.units)-unit models loaded in \(String(format: "%.1f", loadTimeMs))ms"
     )
+  }
+
+  /// Asynchronously load CoreML models from bundle.
+  /// This performs model compilation on a background thread to avoid blocking the main thread.
+  /// - Throws: `DTLNAecError.modelNotFound` if models are not in the bundle
+  @available(macOS 10.15, iOS 13.0, *)
+  public func loadModelsAsync() async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do {
+          try self.loadModels()
+          continuation.resume()
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
+    }
   }
 
   private func findAndCompileModel(name: String) throws -> URL? {
@@ -278,8 +344,10 @@ public final class DTLNAecEchoProcessor {
       micBuffer.removeFirst(Self.blockShift)
       loopbackBuffer.removeFirst(Self.blockShift)
 
-      framesProcessed += 1
-      totalProcessingTimeMs += Date().timeIntervalSince(frameStart) * 1000
+      if config.enablePerformanceTracking {
+        framesProcessed += 1
+        totalProcessingTimeMs += Date().timeIntervalSince(frameStart) * 1000
+      }
     }
 
     return outputSamples
