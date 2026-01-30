@@ -72,6 +72,8 @@ let processor = DTLNAecEchoProcessor(config: config)
 
 All models run well within real-time requirements (8ms per frame).
 
+> **Note:** The 512-unit model currently has a known issue producing NaN values during processing. Use the 128-unit model for production until this is resolved.
+
 ## Audio Requirements
 
 - **Sample rate:** 16,000 Hz
