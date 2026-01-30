@@ -2,12 +2,12 @@
 """Convert 512-unit DTLN-aec model to CoreML with correct weight loading.
 
 Environment Requirements:
-    - Python 3.9-3.11 (coremltools compatibility)
-    - TensorFlow 2.12.0 (tested version for coremltools)
-    - coremltools 7.x or 8.x
+    - Python 3.11 (tested)
+    - TensorFlow 2.15.x
+    - coremltools 7.x
 
     Note: TensorFlow 2.20+ and coremltools 9.x have known incompatibilities
-    with LSTM conversion. Use the tested versions above.
+    with LSTM conversion.
 
 Key findings from TFLite graph analysis:
 - Both encoders (encoder_est and encoder_lpb) share the SAME weights
