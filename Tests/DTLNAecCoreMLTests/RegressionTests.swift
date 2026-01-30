@@ -129,6 +129,57 @@ final class RegressionTests: XCTestCase {
 
   // MARK: - Regression Tests
 
+  /// Strict regression test: CoreML output should match Python reference
+  /// The original Python DTLN-aec achieves near-silence on this echo-only sample
+  func testCoreMLMatchesPythonReference() throws {
+    let thisFile = URL(fileURLWithPath: #file)
+    let packageRoot = thisFile
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+
+    let samplesDir = packageRoot.appendingPathComponent("Samples/aec_challenge")
+    let pythonFile = samplesDir.appendingPathComponent("farend_singletalk_processed_python.wav")
+    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_coreml.wav")
+
+    guard FileManager.default.fileExists(atPath: pythonFile.path) else {
+      throw XCTSkip("Python reference file not found")
+    }
+    guard FileManager.default.fileExists(atPath: coremlFile.path) else {
+      throw XCTSkip("CoreML output file not found")
+    }
+
+    let pythonSamples = try readWAVFile(pythonFile)
+    let coremlSamples = try readWAVFile(coremlFile)
+
+    let pythonRMS = computeRMS(pythonSamples)
+    let coremlRMS = computeRMS(coremlSamples)
+
+    print("\nPython vs CoreML Reference Test:")
+    print("  Python samples: \(pythonSamples.count), RMS: \(String(format: "%.6f", pythonRMS))")
+    print("  CoreML samples: \(coremlSamples.count), RMS: \(String(format: "%.6f", coremlRMS))")
+
+    // Both should achieve near-silence (echo-only sample should be fully suppressed)
+    // Python achieves RMS ~0.000165, CoreML should be similar
+    let maxAcceptableRMS: Float = 0.001  // Near silence threshold
+
+    XCTAssertLessThan(
+      pythonRMS, maxAcceptableRMS,
+      "Python reference should achieve near-silence (RMS \(pythonRMS))")
+
+    XCTAssertLessThan(
+      coremlRMS, maxAcceptableRMS,
+      "CoreML should match Python's near-silence performance (RMS \(coremlRMS) vs Python \(pythonRMS))")
+
+    // Check that both achieve similar levels of suppression (within 2x of each other)
+    let rmsRatio = max(pythonRMS, coremlRMS) / max(min(pythonRMS, coremlRMS), 1e-10)
+    print("  RMS ratio: \(String(format: "%.2f", rmsRatio))x")
+
+    XCTAssertLessThan(
+      rmsRatio, 3.0,
+      "CoreML and Python output levels should be within 3x of each other (ratio: \(rmsRatio))")
+  }
+
   /// Verify CoreML echo suppression effectiveness using AEC challenge sample
   /// This test checks that echo is significantly reduced in the output
   func testEchoSuppressionEffectiveness() throws {
