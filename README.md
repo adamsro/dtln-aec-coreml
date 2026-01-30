@@ -107,6 +107,53 @@ Sample output on Apple M1:
 | 512   | 10.4M  |   687ms |  1.43ms |  2.91ms |   0.18x  | ✅     |
 ```
 
+## Testing Echo Cancellation
+
+### Unit Tests
+
+Run the synthetic AEC quality tests:
+
+```bash
+swift test --filter AECQualityTests
+```
+
+### Real-World Test
+
+Test with actual speaker-to-microphone echo on your Mac:
+
+```bash
+# 1. Record: plays audio through speakers while recording from mic
+swift Scripts/record_aec_test.swift \
+  Tests/DTLNAecCoreMLTests/Fixtures/farend.wav \
+  /tmp/recorded_nearend.wav
+
+# 2. Process: run echo cancellation
+swift run FileProcessor \
+  --mic /tmp/recorded_nearend.wav \
+  --ref Tests/DTLNAecCoreMLTests/Fixtures/farend.wav \
+  --output /tmp/cleaned.wav
+
+# 3. Compare before/after
+afplay /tmp/recorded_nearend.wav  # With echo
+afplay /tmp/cleaned.wav           # Echo cancelled
+```
+
+### Process Your Own Files
+
+```bash
+swift run FileProcessor \
+  --mic your_mic_recording.wav \
+  --ref your_system_audio.wav \
+  --output cleaned.wav \
+  --model small  # or 'large'
+```
+
+Input files must be 16kHz mono WAV. Convert with ffmpeg if needed:
+
+```bash
+ffmpeg -i input.wav -ar 16000 -ac 1 -c:a pcm_f32le output.wav
+```
+
 ## How It Works
 
 DTLN-aec uses a two-part architecture:

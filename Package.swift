@@ -33,6 +33,11 @@ let package = Package(
       name: "DTLNBenchmark",
       dependencies: ["DTLNAecCoreML"]
     ),
+    .executableTarget(
+      name: "FileProcessor",
+      dependencies: ["DTLNAecCoreML"],
+      path: "Examples/FileProcessor"
+    ),
     .testTarget(
       name: "DTLNAecCoreMLTests",
       dependencies: ["DTLNAecCoreML"]

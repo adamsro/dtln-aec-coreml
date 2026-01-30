@@ -216,17 +216,20 @@ print()
 print("Processing...")
 let startTime = Date()
 
-// Feed reference
-processor.feedFarEnd(ref)
-
-// Process in chunks
+// Process in chunks - feed far-end and near-end in sync
 let chunkSize = 128
 var output: [Float] = []
 
 for start in stride(from: 0, to: mic.count, by: chunkSize) {
   let end = min(start + chunkSize, mic.count)
-  let chunk = Array(mic[start..<end])
-  let processed = processor.processNearEnd(chunk)
+
+  // Feed far-end chunk (reference signal)
+  let refChunk = Array(ref[start..<end])
+  processor.feedFarEnd(refChunk)
+
+  // Process near-end chunk (microphone signal)
+  let micChunk = Array(mic[start..<end])
+  let processed = processor.processNearEnd(micChunk)
   output.append(contentsOf: processed)
 }
 
