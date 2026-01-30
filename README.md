@@ -69,8 +69,8 @@ let processor = DTLNAecEchoProcessor(config: config)
 
 | Model | Units | Parameters | Size | Latency (M1) | Use Case |
 |-------|-------|------------|------|--------------|----------|
-| `.small` | 128 | 1.8M | 3.6 MB | 0.76ms | Production (recommended) |
-| `.large` | 512 | 10.4M | 20.3 MB | 1.43ms | Maximum quality |
+| `.small` | 128 | 1.8M | 3.6 MB | 0.76ms | Low latency, good quality |
+| `.large` | 512 | 10.4M | 20.3 MB | 1.43ms | Best quality (recommended) |
 
 All models run well within real-time requirements (8ms per frame).
 

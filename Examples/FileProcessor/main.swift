@@ -116,7 +116,7 @@ func printUsage() {
       --output <file>   Output WAV file path
 
     Options:
-      --model <size>    Model size: small (default), large
+      --model <size>    Model size: small, large (default)
       --help            Show this help message
 
     Example:
@@ -132,7 +132,7 @@ func printUsage() {
 var micPath: String?
 var refPath: String?
 var outputPath: String?
-var modelSize: DTLNAecModelSize = .small
+var modelSize: DTLNAecModelSize = .large
 
 // Parse arguments
 var args = CommandLine.arguments.dropFirst()
