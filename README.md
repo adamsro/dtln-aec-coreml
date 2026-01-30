@@ -1,5 +1,7 @@
 # DTLN-aec CoreML
 
+> **Note:** This repository is still being dogfooded and has not been thoroughly tested.
+
 Neural acoustic echo cancellation for Apple platforms using CoreML.
 
 This package provides a Swift wrapper for [DTLN-aec](https://github.com/breizhn/DTLN-aec), a dual-signal transformation LSTM network that placed **3rd in the Microsoft AEC Challenge 2021**.
