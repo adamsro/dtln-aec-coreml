@@ -148,10 +148,10 @@ public final class DTLNAecEchoProcessor {
 
   // MARK: - FFT Setup (Accelerate vDSP)
 
-  private var fftSetup: vDSP.FFT<DSPSplitComplex>?
+  private var fftSetup: OpaquePointer?
   private var window: [Float]
-  private var fftRealBuffer: [Float]
-  private var fftImagBuffer: [Float]
+  private var fftRealBuffer: [Float]  // Size: blockLen/2 for packed real FFT
+  private var fftImagBuffer: [Float]  // Size: blockLen/2 for packed real FFT
 
   // MARK: - Preallocated MLMultiArrays
 
@@ -179,9 +179,17 @@ public final class DTLNAecEchoProcessor {
     outputBuffer = [Float](repeating: 0, count: Self.blockLen)
     window = [Float](repeating: 0, count: Self.blockLen)
     vDSP_hann_window(&window, vDSP_Length(Self.blockLen), Int32(vDSP_HANN_NORM))
-    fftRealBuffer = [Float](repeating: 0, count: Self.blockLen)
-    fftImagBuffer = [Float](repeating: 0, count: Self.blockLen)
-    fftSetup = vDSP.FFT(log2n: 9, radix: .radix2, ofType: DSPSplitComplex.self)
+    // For packed real FFT, buffers are half the block size
+    fftRealBuffer = [Float](repeating: 0, count: Self.blockLen / 2)
+    fftImagBuffer = [Float](repeating: 0, count: Self.blockLen / 2)
+    // log2n = 9 for 512-point real FFT
+    fftSetup = vDSP_create_fftsetup(vDSP_Length(9), FFTRadix(kFFTRadix2))
+  }
+
+  deinit {
+    if let fftSetup {
+      vDSP_destroy_fftsetup(fftSetup)
+    }
   }
 
   /// Initialize with specified model size using default configuration.
@@ -430,8 +438,12 @@ public final class DTLNAecEchoProcessor {
       )
     }
 
-    fftRealBuffer = samples
-    fftImagBuffer = [Float](repeating: 0, count: Self.blockLen)
+    // Pack real samples for vDSP real FFT: realp[i] = samples[2*i], imagp[i] = samples[2*i+1]
+    let halfLen = Self.blockLen / 2
+    for i in 0..<halfLen {
+      fftRealBuffer[i] = samples[2 * i]
+      fftImagBuffer[i] = samples[2 * i + 1]
+    }
 
     var magnitude = [Float](repeating: 0, count: Self.fftBins)
     var phase = [Float](repeating: 0, count: Self.fftBins)
@@ -439,14 +451,27 @@ public final class DTLNAecEchoProcessor {
     fftRealBuffer.withUnsafeMutableBufferPointer { realPtr in
       fftImagBuffer.withUnsafeMutableBufferPointer { imagPtr in
         var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
-        fftSetup.forward(input: splitComplex, output: &splitComplex)
-        vDSP_zvabs(&splitComplex, 1, &magnitude, 1, vDSP_Length(Self.fftBins))
-        for i in 0..<Self.fftBins {
+
+        // Forward real FFT - output is packed: DC in realp[0], Nyquist in imagp[0]
+        vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(9), FFTDirection(FFT_FORWARD))
+
+        // DC bin (index 0) - stored in realp[0], purely real
+        magnitude[0] = abs(realPtr[0])
+        phase[0] = realPtr[0] >= 0 ? 0 : .pi
+
+        // Bins 1 to fftBins-2 (indices 1..255)
+        for i in 1..<(Self.fftBins - 1) {
+          magnitude[i] = sqrt(realPtr[i] * realPtr[i] + imagPtr[i] * imagPtr[i])
           phase[i] = atan2(imagPtr[i], realPtr[i])
         }
+
+        // Nyquist bin (index fftBins-1 = 256) - stored in imagp[0], purely real
+        magnitude[Self.fftBins - 1] = abs(imagPtr[0])
+        phase[Self.fftBins - 1] = imagPtr[0] >= 0 ? 0 : .pi
       }
     }
 
+    // vDSP real FFT scales by 2, compensate to match NumPy rfft
     vDSP.multiply(0.5, magnitude, result: &magnitude)
     return (magnitude, phase)
   }
@@ -456,43 +481,61 @@ public final class DTLNAecEchoProcessor {
   {
     guard let fftSetup else { return micSamples }
 
-    fftRealBuffer = micSamples
-    fftImagBuffer = [Float](repeating: 0, count: Self.blockLen)
+    // Pack real samples for vDSP real FFT
+    let halfLen = Self.blockLen / 2
+    for i in 0..<halfLen {
+      fftRealBuffer[i] = micSamples[2 * i]
+      fftImagBuffer[i] = micSamples[2 * i + 1]
+    }
+
     var output = [Float](repeating: 0, count: Self.blockLen)
+
+    // Helper to get mask value at index
+    let getMask: (Int) -> Float = { index in
+      if mask.dataType == .float16 {
+        let maskPtr = mask.dataPointer.assumingMemoryBound(to: Float16.self)
+        return Float(maskPtr[index])
+      } else {
+        let maskPtr = mask.dataPointer.assumingMemoryBound(to: Float.self)
+        return maskPtr[index]
+      }
+    }
 
     fftRealBuffer.withUnsafeMutableBufferPointer { realPtr in
       fftImagBuffer.withUnsafeMutableBufferPointer { imagPtr in
         var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!, imagp: imagPtr.baseAddress!)
-        fftSetup.forward(input: splitComplex, output: &splitComplex)
 
-        for i in 0..<Self.fftBins {
-          let m: Float
-          if mask.dataType == .float16 {
-            let maskPtr = mask.dataPointer.assumingMemoryBound(to: Float16.self)
-            m = Float(maskPtr[i])
-          } else {
-            let maskPtr = mask.dataPointer.assumingMemoryBound(to: Float.self)
-            m = maskPtr[i]
-          }
+        // Forward real FFT
+        vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(9), FFTDirection(FFT_FORWARD))
+
+        // Apply mask with proper handling of packed DC/Nyquist
+        // DC bin (index 0): realp[0] contains DC, apply mask[0]
+        realPtr[0] *= getMask(0)
+
+        // Nyquist bin: imagp[0] contains Nyquist, apply mask[fftBins-1] (index 256)
+        imagPtr[0] *= getMask(Self.fftBins - 1)
+
+        // Regular bins 1 to fftBins-2 (indices 1..255)
+        for i in 1..<(Self.fftBins - 1) {
+          let m = getMask(i)
           realPtr[i] *= m
           imagPtr[i] *= m
         }
 
-        for i in Self.fftBins..<Self.blockLen {
-          let mirrorIdx = Self.blockLen - i
-          realPtr[i] = realPtr[mirrorIdx]
-          imagPtr[i] = -imagPtr[mirrorIdx]
-        }
+        // Inverse real FFT - vDSP handles conjugate symmetry internally
+        vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(9), FFTDirection(FFT_INVERSE))
 
-        fftSetup.inverse(input: splitComplex, output: &splitComplex)
-
-        for i in 0..<Self.blockLen {
-          output[i] = realPtr[i]
+        // Unpack: output[2*i] = realp[i], output[2*i+1] = imagp[i]
+        for i in 0..<halfLen {
+          output[2 * i] = realPtr[i]
+          output[2 * i + 1] = imagPtr[i]
         }
       }
     }
 
-    vDSP.multiply(2.0 / Float(Self.blockLen), output, result: &output)
+    // vDSP real FFT scales by 2 on forward and 2 on inverse = 4x total
+    // Divide by 2*N to get correct amplitude
+    vDSP.multiply(1.0 / Float(2 * Self.blockLen), output, result: &output)
     return output
   }
 
