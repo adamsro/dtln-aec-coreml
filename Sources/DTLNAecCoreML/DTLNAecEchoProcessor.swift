@@ -265,8 +265,10 @@ public final class DTLNAecEchoProcessor {
 
   private func initializeStates() throws {
     let stateShape = [1, Self.numLayers, numUnits, 2] as [NSNumber]
-    states1 = try MLMultiArray(shape: stateShape, dataType: .float32)
-    states2 = try MLMultiArray(shape: stateShape, dataType: .float32)
+    // Try float32 for all models and see if there's a type mismatch
+    let stateType: MLMultiArrayDataType = .float32
+    states1 = try MLMultiArray(shape: stateShape, dataType: stateType)
+    states2 = try MLMultiArray(shape: stateShape, dataType: stateType)
     resetStates()
   }
 
@@ -285,12 +287,20 @@ public final class DTLNAecEchoProcessor {
     guard let states1, let states2 else { return }
 
     let count = states1.count
-    let ptr1 = states1.dataPointer.assumingMemoryBound(to: Float.self)
-    let ptr2 = states2.dataPointer.assumingMemoryBound(to: Float.self)
-
-    for i in 0..<count {
-      ptr1[i] = 0
-      ptr2[i] = 0
+    if states1.dataType == .float16 {
+      let ptr1 = states1.dataPointer.assumingMemoryBound(to: Float16.self)
+      let ptr2 = states2.dataPointer.assumingMemoryBound(to: Float16.self)
+      for i in 0..<count {
+        ptr1[i] = 0
+        ptr2[i] = 0
+      }
+    } else {
+      let ptr1 = states1.dataPointer.assumingMemoryBound(to: Float.self)
+      let ptr2 = states2.dataPointer.assumingMemoryBound(to: Float.self)
+      for i in 0..<count {
+        ptr1[i] = 0
+        ptr2[i] = 0
+      }
     }
 
     micBuffer.removeAll(keepingCapacity: true)
@@ -536,13 +546,22 @@ public final class DTLNAecEchoProcessor {
 
   private func copyStates(from source: MLMultiArray, to dest: MLMultiArray) {
     let count = min(source.count, dest.count)
-    if source.dataType == .float16 {
+    if source.dataType == .float16 && dest.dataType == .float16 {
+      // Both float16 - direct copy
+      let srcPtr = source.dataPointer.assumingMemoryBound(to: Float16.self)
+      let dstPtr = dest.dataPointer.assumingMemoryBound(to: Float16.self)
+      for i in 0..<count {
+        dstPtr[i] = srcPtr[i]
+      }
+    } else if source.dataType == .float16 {
+      // float16 -> float32
       let srcPtr = source.dataPointer.assumingMemoryBound(to: Float16.self)
       let dstPtr = dest.dataPointer.assumingMemoryBound(to: Float.self)
       for i in 0..<count {
         dstPtr[i] = Float(srcPtr[i])
       }
     } else {
+      // float32 -> float32
       let srcPtr = source.dataPointer.assumingMemoryBound(to: Float.self)
       let dstPtr = dest.dataPointer.assumingMemoryBound(to: Float.self)
       for i in 0..<count {

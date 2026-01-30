@@ -1,3 +1,4 @@
+import CoreML
 import XCTest
 
 @testable import DTLNAecCoreML
@@ -291,6 +292,44 @@ final class DTLNAecTests: XCTestCase {
     XCTAssertTrue(largeProcessor.isInitialized)
     XCTAssertEqual(smallProcessor.numUnits, 128)
     XCTAssertEqual(largeProcessor.numUnits, 512)
+  }
+
+  /// Test that 512-unit model works after float16 state fix
+  func testLargeModelCPUOnly() throws {
+    let config = DTLNAecConfig(modelSize: .large, computeUnits: .cpuOnly)
+    let processor = DTLNAecEchoProcessor(config: config)
+    try processor.loadModels()
+
+    let numSamples = 16000  // 1 second
+    var farEnd = [Float](repeating: 0, count: numSamples)
+    var nearEnd = [Float](repeating: 0, count: numSamples)
+
+    for i in 0..<numSamples {
+      let t = Float(i) / 16000.0
+      farEnd[i] = 0.3 * sin(2 * .pi * 440 * t)
+      nearEnd[i] = 0.2 * sin(2 * .pi * 440 * t)
+    }
+
+    // Process in chunks
+    let chunkSize = 128
+    var output: [Float] = []
+    var firstNaN: Int? = nil
+
+    for (idx, start) in stride(from: 0, to: numSamples, by: chunkSize).enumerated() {
+      let end = min(start + chunkSize, numSamples)
+      processor.feedFarEnd(Array(farEnd[start..<end]))
+      let processed = processor.processNearEnd(Array(nearEnd[start..<end]))
+
+      if firstNaN == nil && processed.contains(where: { $0.isNaN }) {
+        firstNaN = idx
+      }
+      output.append(contentsOf: processed)
+    }
+
+    print("Large model (CPU-only): \(output.count) samples")
+    let hasNaN = output.contains { $0.isNaN }
+    print("Has NaN: \(hasNaN), first at frame: \(firstNaN ?? -1)")
+    XCTAssertFalse(hasNaN, "Large model should not produce NaN with float16 states")
   }
 
   // MARK: - Async Loading Tests
