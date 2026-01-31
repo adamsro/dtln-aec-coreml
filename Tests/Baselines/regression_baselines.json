@@ -1,0 +1,111 @@
+{
+  "version": "1.1.0",
+  "date": "2026-01-30",
+  "description": "Baseline metrics for regression tests. Tests verify results meet or exceed these values.",
+  "tolerance": {
+    "db": 0.5,
+    "rms_ratio": 0.1,
+    "convergence_ratio": 0.1,
+    "spectral_pct": 5.0
+  },
+  "models": {
+    "128-unit": {
+      "aec_challenge": {
+        "reduction_db": 47.5,
+        "output_rms": 0.000306,
+        "peak_amplitude": 0.012052,
+        "crest_factor_db": 31.9,
+        "convergence_ratio": 1.0,
+        "spectral_energy": {
+          "low_pct": 89.4,
+          "mid_pct": 6.1,
+          "high_pct": 4.5
+        },
+        "segmented_rms": {
+          "min": 0.000032,
+          "max": 0.002009,
+          "mean": 0.000209,
+          "stddev": 0.000224
+        },
+        "description": "farend_singletalk sample - echo-only, should achieve near-silence"
+      },
+      "realworld": {
+        "reduction_db": 0.9,
+        "output_rms": 0.092708,
+        "peak_amplitude": 0.837216,
+        "crest_factor_db": 19.1,
+        "convergence_ratio": 0.48,
+        "spectral_energy": {
+          "low_pct": 42.0,
+          "mid_pct": 57.9,
+          "high_pct": 0.1
+        },
+        "segmented_rms": {
+          "min": 0.000141,
+          "max": 0.324734,
+          "mean": 0.052754,
+          "stddev": 0.076432
+        },
+        "time_evolution": {
+          "0.5s": 0.000924,
+          "1.6s": 0.001292,
+          "2.6s": 0.054675
+        },
+        "description": "farend_singletalk_realworld sample - shows slow state convergence"
+      },
+      "python_reference": {
+        "python_rms": 0.000242,
+        "coreml_rms": 0.000306,
+        "rms_ratio": 1.26,
+        "max_acceptable_rms": 0.001,
+        "max_rms_ratio": 3.0,
+        "description": "CoreML output compared to Python DTLN-aec reference"
+      }
+    },
+    "512-unit": {
+      "aec_challenge": {
+        "reduction_db": 43.8,
+        "output_rms": 0.000470,
+        "peak_amplitude": 0.023349,
+        "crest_factor_db": 33.9,
+        "convergence_ratio": 1.0,
+        "spectral_energy": {
+          "low_pct": 77.5,
+          "mid_pct": 9.2,
+          "high_pct": 13.3
+        },
+        "segmented_rms": {
+          "min": 0.000028,
+          "max": 0.004702,
+          "mean": 0.000155,
+          "stddev": 0.000444
+        },
+        "description": "farend_singletalk sample - echo-only, better spectral balance than 128-unit"
+      },
+      "realworld": {
+        "reduction_db": 0.9,
+        "output_rms": 0.092316,
+        "peak_amplitude": 0.849828,
+        "crest_factor_db": 19.3,
+        "convergence_ratio": 0.49,
+        "spectral_energy": {
+          "low_pct": 41.6,
+          "mid_pct": 58.3,
+          "high_pct": 0.1
+        },
+        "segmented_rms": {
+          "min": 0.000552,
+          "max": 0.336194,
+          "mean": 0.054126,
+          "stddev": 0.074983
+        },
+        "time_evolution": {
+          "0.5s": 0.004575,
+          "1.6s": 0.005937,
+          "2.6s": 0.063744
+        },
+        "description": "farend_singletalk_realworld sample - more consistent initial processing than 128-unit"
+      }
+    }
+  }
+}
