@@ -12,11 +12,13 @@ Samples from the Microsoft AEC Challenge dataset.
 |------|-------------|
 | `farend_singletalk_lpb.wav` | Far-end (loopback) reference signal |
 | `farend_singletalk_mic.wav` | Microphone recording with echo |
-| `farend_singletalk_processed_python.wav` | Processed by original Python DTLN-aec (128-unit) |
-| `farend_singletalk_processed_128.wav` | Processed by CoreML 128-unit model (47.5 dB reduction) |
-| `farend_singletalk_processed_512.wav` | Processed by CoreML 512-unit model (43.8 dB reduction) |
+| `farend_singletalk_processed_python_128.wav` | Processed by 128-unit TFLite model (49.6 dB reduction) |
+| `farend_singletalk_processed_python_128.txt` | Metadata documenting Python reference provenance |
+| `farend_singletalk_processed_coreml_128.wav` | Processed by CoreML 128-unit model (47.5 dB reduction) |
+| `farend_singletalk_processed_coreml_512.wav` | Processed by CoreML 512-unit model (43.8 dB reduction) |
 | `farend_singletalk_realworld_mic.wav` | Real speaker-to-mic recording using lpb |
-| `farend_singletalk_realworld_processed.wav` | Processed realworld recording |
+| `farend_singletalk_realworld_processed_coreml_128.wav` | Realworld processed by CoreML 128-unit model |
+| `farend_singletalk_realworld_processed_coreml_512.wav` | Realworld processed by CoreML 512-unit model |
 
 ### `realworld/`
 
@@ -26,17 +28,25 @@ Real-world recordings made by playing audio through speakers and recording with 
 |------|-------------|
 | `test_lpb.wav` | Reference signal played through speakers |
 | `test_mic.wav` | Microphone recording (contains echo) |
-| `test_processed.wav` | Echo-cancelled output |
+| `test_processed_python_128.wav` | Processed by 128-unit TFLite model (9.2 dB reduction) |
+| `test_processed_python_128.txt` | Metadata documenting Python reference provenance |
+| `test_processed_coreml_128.wav` | Processed by CoreML 128-unit model |
+| `test_processed_coreml_512.wav` | Processed by CoreML 512-unit model |
 
 ## Usage
 
 ### Compare outputs
 
 ```bash
-# Listen to Python reference vs CoreML outputs
-afplay Samples/aec_challenge/farend_singletalk_processed_python.wav  # Python 128-unit
-afplay Samples/aec_challenge/farend_singletalk_processed_128.wav     # CoreML 128-unit
-afplay Samples/aec_challenge/farend_singletalk_processed_512.wav     # CoreML 512-unit
+# Listen to Python reference vs CoreML outputs (AEC challenge sample)
+afplay Samples/aec_challenge/farend_singletalk_processed_python_128.wav  # Python 128-unit
+afplay Samples/aec_challenge/farend_singletalk_processed_coreml_128.wav  # CoreML 128-unit
+afplay Samples/aec_challenge/farend_singletalk_processed_coreml_512.wav  # CoreML 512-unit
+
+# Compare real-world recordings
+afplay Samples/realworld/test_mic.wav                   # Original with echo
+afplay Samples/realworld/test_processed_coreml_128.wav  # CoreML 128-unit
+afplay Samples/realworld/test_processed_coreml_512.wav  # CoreML 512-unit
 ```
 
 ### Process your own files

@@ -1,0 +1,15 @@
+DTLN-aec Python Reference Output
+========================================
+
+Model: 128-unit DTLN-aec
+Model source: https://github.com/breizhn/DTLN-aec
+Model files:
+  - dtln_aec_128_1.tflite
+  - dtln_aec_128_2.tflite
+
+Input mic: farend_singletalk_mic.wav
+Input lpb: farend_singletalk_lpb.wav
+
+Output samples: 173920
+Output RMS: 0.000242
+Echo reduction: 49.6 dB
