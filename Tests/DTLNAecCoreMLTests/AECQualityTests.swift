@@ -204,8 +204,15 @@ final class AECQualityTests: XCTestCase {
       nearEnd[i] = farEnd[i - echoDelaySamples] * 0.3
     }
 
-    processor.feedFarEnd(farEnd)
-    let output = processor.processNearEnd(nearEnd)
+    // Process in streaming fashion to avoid ring buffer overflow
+    let chunkSize = 512
+    var output: [Float] = []
+    for start in stride(from: 0, to: numSamples, by: chunkSize) {
+      let end = min(start + chunkSize, numSamples)
+      processor.feedFarEnd(Array(farEnd[start..<end]))
+      let processed = processor.processNearEnd(Array(nearEnd[start..<end]))
+      output.append(contentsOf: processed)
+    }
 
     // Skip the echo delay period + warmup to measure steady-state suppression
     // Echo starts at echoDelaySamples, add 2000 samples (~125ms) for model warmup
@@ -222,10 +229,21 @@ final class AECQualityTests: XCTestCase {
     print("  Input samples: \(nearEnd.count), Output samples: \(output.count)")
     print("  Measuring from sample \(measureStart)")
 
-    // Note: Synthetic multi-frequency signals may not perform as well as real audio.
+    // Verify output quality
+    // 1. Should produce reasonable output count
+    XCTAssertGreaterThan(output.count, numSamples - 256,
+      "Output should have approximately the same number of samples as input")
+
+    // 2. Output should not contain NaN or Inf
+    let hasInvalidValues = output.contains { $0.isNaN || $0.isInfinite }
+    XCTAssertFalse(hasInvalidValues, "Output should not contain NaN or Inf values")
+
+    // 3. Echo reduction threshold
+    // Note: Synthetic multi-frequency signals with random phases may not perform as well as real audio.
     // Real audio tests (see testCompareWithPythonReference) show excellent suppression
     // matching Python TFLite reference (49-53 dB).
-    XCTAssertGreaterThan(reductionDb, 1, "Expected >1dB reduction for broadband echo")
+    // Using 1dB as minimum for synthetic broadband signals (original threshold).
+    XCTAssertGreaterThan(reductionDb, 1, "Expected >1dB reduction for broadband echo (steady-state)")
   }
 
   /// Double-talk scenario: simultaneous far-end and near-end

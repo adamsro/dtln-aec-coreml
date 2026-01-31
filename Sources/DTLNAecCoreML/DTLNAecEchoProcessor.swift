@@ -50,15 +50,26 @@ public struct DTLNAecConfig: Sendable {
   /// Whether to track performance metrics like average frame time (default: true)
   public var enablePerformanceTracking: Bool
 
+  /// Whether to validate model outputs for NaN/Inf values (default: true)
+  /// When enabled, NaN/Inf outputs cause passthrough behavior for that frame.
+  public var validateNumerics: Bool
+
+  /// Whether to clip output samples to [-1, 1] range (default: true)
+  public var clipOutput: Bool
+
   /// Creates a configuration with default settings.
   public init(
     modelSize: DTLNAecModelSize = .small,
     computeUnits: MLComputeUnits = .cpuAndNeuralEngine,
-    enablePerformanceTracking: Bool = true
+    enablePerformanceTracking: Bool = true,
+    validateNumerics: Bool = true,
+    clipOutput: Bool = true
   ) {
     self.modelSize = modelSize
     self.computeUnits = computeUnits
     self.enablePerformanceTracking = enablePerformanceTracking
+    self.validateNumerics = validateNumerics
+    self.clipOutput = clipOutput
   }
 }
 
@@ -115,6 +126,9 @@ public final class DTLNAecEchoProcessor {
 
   /// Number of FFT bins (blockLen/2 + 1)
   public static let fftBins = 257
+
+  /// log2(blockLen) for FFT setup
+  private static let fftLog2n = vDSP_Length(Int(log2(Double(blockLen))))
 
   /// Number of LSTM layers
   static let numLayers = 2
@@ -194,8 +208,8 @@ public final class DTLNAecEchoProcessor {
     // Ring buffers for pending samples (O(1) operations)
     pendingMicRing = RingBuffer(capacity: Self.ringBufferCapacity)
     pendingLoopbackRing = RingBuffer(capacity: Self.ringBufferCapacity)
-    // log2n = 9 for 512-point real FFT
-    fftSetup = vDSP_create_fftsetup(vDSP_Length(9), FFTRadix(kFFTRadix2))
+    // log2n for FFT setup (computed from blockLen)
+    fftSetup = vDSP_create_fftsetup(Self.fftLog2n, FFTRadix(kFFTRadix2))
   }
 
   deinit {
@@ -539,9 +553,12 @@ public final class DTLNAecEchoProcessor {
   /// Python-style buffer shift: shift left by blockShift and add new samples at end
   private func shiftAndAppend(buffer: inout [Float], newSamples: [Float]) {
     let overlapCount = Self.blockLen - Self.blockShift  // 384
-    // Use memmove-style bulk copy instead of element-by-element loop
-    buffer.withUnsafeMutableBufferPointer { ptr in
-      ptr.baseAddress!.update(from: ptr.baseAddress! + Self.blockShift, count: overlapCount)
+    // Use memmove for overlapping memory regions (source and dest overlap)
+    _ = buffer.withUnsafeMutableBytes { ptr in
+      memmove(
+        ptr.baseAddress!,
+        ptr.baseAddress! + Self.blockShift * MemoryLayout<Float>.stride,
+        overlapCount * MemoryLayout<Float>.stride)
     }
     // Add new samples at end (last 128 positions)
     let copyCount = min(newSamples.count, Self.blockShift)
@@ -616,7 +633,20 @@ public final class DTLNAecEchoProcessor {
     else { return nil }
 
     copyStates(from: newStates2, to: states2)
-    return extractFromMLArray(output, count: Self.blockLen)
+    var result = extractFromMLArray(output, count: Self.blockLen)
+
+    // Validate numerics if enabled
+    if config.validateNumerics && containsInvalidNumerics(result) {
+      // Fall back to passthrough (mic input) on NaN/Inf
+      return mic
+    }
+
+    // Clip output if enabled
+    if config.clipOutput {
+      clipToValidRange(&result)
+    }
+
+    return result
   }
 
   // MARK: - FFT Helpers
@@ -672,6 +702,15 @@ public final class DTLNAecEchoProcessor {
           phase[i] = atan2(imagPtr[i], realPtr[i])
         }
       }
+    }
+
+    // Clamp to zero before sqrt to prevent NaN from floating-point errors
+    var lowerBound: Float = 0.0
+    var upperBound: Float = .greatestFiniteMagnitude
+    magnitude.withUnsafeMutableBufferPointer { magPtr in
+      vDSP_vclip(
+        magPtr.baseAddress! + 1, 1, &lowerBound, &upperBound,
+        magPtr.baseAddress! + 1, 1, vDSP_Length(Self.fftBins - 2))
     }
 
     // Take sqrt of squared magnitudes for bins 1..255
@@ -825,6 +864,30 @@ public final class DTLNAecEchoProcessor {
       for i in 0..<count {
         dstPtr[i] = srcPtr[i]
       }
+    }
+  }
+
+  // MARK: - Numeric Validation
+
+  /// Check if array contains any NaN or Inf values
+  private func containsInvalidNumerics(_ array: [Float]) -> Bool {
+    for value in array {
+      if value.isNaN || value.isInfinite {
+        return true
+      }
+    }
+    return false
+  }
+
+  /// Clip array values to [-1, 1] range in place
+  private func clipToValidRange(_ array: inout [Float]) {
+    let count = array.count
+    var lowerBound: Float = -1.0
+    var upperBound: Float = 1.0
+    array.withUnsafeMutableBufferPointer { ptr in
+      vDSP_vclip(
+        ptr.baseAddress!, 1, &lowerBound, &upperBound,
+        ptr.baseAddress!, 1, vDSP_Length(count))
     }
   }
 }
