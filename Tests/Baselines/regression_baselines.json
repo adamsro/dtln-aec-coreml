@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "date": "2026-01-30",
-  "description": "Baseline metrics for regression tests. Tests verify results meet or exceed these values.",
+  "description": "Baseline metrics for regression tests. Tests PASS only if results meet or exceed these values - a passing test means NO REGRESSION.",
   "tolerance": {
     "db": 0.5,
     "rms_ratio": 0.1,

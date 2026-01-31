@@ -1,3 +1,16 @@
+// RegressionTests.swift
+// DTLN-aec CoreML Regression Tests
+//
+// IMPORTANT: These tests verify that model output quality meets or exceeds
+// established baselines. A passing test means NO REGRESSION from baseline values.
+//
+// Each test compares current output metrics (dB reduction, RMS, etc.) against
+// the baselines defined in Tests/Baselines/regression_baselines.json. Tests fail
+// if metrics fall below baseline thresholds (with tolerance), indicating a
+// regression in echo cancellation quality.
+//
+// Baseline values should be updated when intentional improvements are made.
+
 import Foundation
 import XCTest
 
