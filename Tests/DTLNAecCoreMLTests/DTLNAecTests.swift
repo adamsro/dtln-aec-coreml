@@ -232,6 +232,173 @@ final class DTLNAecTests: XCTestCase {
     XCTAssertGreaterThan(output.count, 0)
   }
 
+  // MARK: - Flush Tests
+
+  func testFlushReturnsBufferedSamples() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Process some data to fill buffers
+    let input = [Float](repeating: 0.3, count: 200)
+    processor.feedFarEnd(input)
+    let output = processor.processNearEnd(input)
+
+    // 200 samples -> 128 processed, 72 pending
+    XCTAssertEqual(output.count, 128)
+
+    // Before flush, should have 72 pending + 384 overlap tail = 456
+    XCTAssertEqual(processor.pendingSampleCount, 72 + 384)
+
+    // Flush should return all remaining samples
+    let flushed = processor.flush()
+
+    // Should get: 128 (from processing padded pending) + 384 (overlap tail) = 512
+    XCTAssertEqual(flushed.count, 512)
+
+    // After flush, should have 0 pending + 384 tail (but outputBuffer is zeroed)
+    XCTAssertEqual(processor.pendingSampleCount, 384)
+  }
+
+  func testFlushWithNoPendingSamples() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Process exactly blockShift samples so no pending remain
+    let input = [Float](repeating: 0.3, count: 128)
+    processor.feedFarEnd(input)
+    let output = processor.processNearEnd(input)
+
+    XCTAssertEqual(output.count, 128)
+    XCTAssertEqual(processor.pendingSampleCount, 384)  // Only overlap tail
+
+    // Flush should return just the overlap-add tail
+    let flushed = processor.flush()
+    XCTAssertEqual(flushed.count, 384)
+  }
+
+  func testFlushWithoutProcessing() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Just feed some samples without triggering processing
+    let input = [Float](repeating: 0.3, count: 64)
+    processor.feedFarEnd(input)
+    _ = processor.processNearEnd(input)
+
+    // Should have 64 pending samples
+    XCTAssertEqual(processor.pendingSampleCount, 64 + 384)
+
+    let flushed = processor.flush()
+
+    // 128 from padded pending frame + 384 overlap tail
+    XCTAssertEqual(flushed.count, 512)
+  }
+
+  func testFlushPreservesLSTMStates() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Generate a distinctive signal pattern
+    var input = [Float](repeating: 0, count: 512)
+    for i in 0..<512 {
+      input[i] = Float(sin(Double(i) * 0.1)) * 0.5
+    }
+
+    // Process to warm up LSTM states
+    processor.feedFarEnd(input)
+    let _ = processor.processNearEnd(input)
+
+    // Flush (should preserve LSTM states)
+    _ = processor.flush()
+
+    // Process more data after flush - LSTM states should be preserved
+    // (the output would be different if states were reset)
+    processor.feedFarEnd(input)
+    let outputAfterFlush = processor.processNearEnd(input)
+
+    // Create a fresh processor and compare
+    let freshProcessor = DTLNAecEchoProcessor(modelSize: .small)
+    try freshProcessor.loadModelsFromPackage()
+    freshProcessor.feedFarEnd(input)
+    let freshOutput = freshProcessor.processNearEnd(input)
+
+    // Outputs should differ because LSTM states were preserved after flush
+    // vs fresh states in the new processor
+    var differenceFound = false
+    for i in 0..<min(outputAfterFlush.count, freshOutput.count) {
+      if abs(outputAfterFlush[i] - freshOutput[i]) > 0.001 {
+        differenceFound = true
+        break
+      }
+    }
+    XCTAssertTrue(differenceFound, "LSTM states should be preserved after flush, causing different output than fresh processor")
+  }
+
+  func testFlushClearsPendingBuffers() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Add pending samples
+    let input = [Float](repeating: 0.3, count: 64)
+    processor.feedFarEnd(input)
+    _ = processor.processNearEnd(input)
+
+    XCTAssertEqual(processor.pendingSampleCount, 64 + 384)
+
+    // Flush
+    _ = processor.flush()
+
+    // Pending should be cleared (only overlap tail remaining, which is zeroed)
+    XCTAssertEqual(processor.pendingSampleCount, 384)
+
+    // Calling flush again should only return zeros from zeroed outputBuffer
+    let secondFlush = processor.flush()
+    XCTAssertEqual(secondFlush.count, 384)
+
+    // Should be all zeros
+    let nonZeroCount = secondFlush.filter { abs($0) > 0.0001 }.count
+    XCTAssertEqual(nonZeroCount, 0, "Second flush should return zeros from cleared buffer")
+  }
+
+  func testFlushUninitializedProcessor() {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    // Don't load models
+
+    // When uninitialized, processNearEnd passes through directly without buffering
+    let input = [Float](repeating: 0.5, count: 64)
+    processor.feedFarEnd(input)
+    let output = processor.processNearEnd(input)
+
+    // Passthrough mode: input returned directly
+    XCTAssertEqual(output.count, 64)
+    XCTAssertEqual(output, input)
+
+    // Flush on uninitialized processor returns empty (nothing buffered)
+    let flushed = processor.flush()
+    XCTAssertEqual(flushed.count, 0)
+  }
+
+  func testPendingSampleCount() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    try processor.loadModelsFromPackage()
+
+    // Initially should have just overlap tail
+    XCTAssertEqual(processor.pendingSampleCount, 384)
+
+    // Add 50 samples (not enough to process)
+    let input50 = [Float](repeating: 0.3, count: 50)
+    processor.feedFarEnd(input50)
+    _ = processor.processNearEnd(input50)
+    XCTAssertEqual(processor.pendingSampleCount, 50 + 384)
+
+    // Add 100 more samples (150 total pending, should process one frame)
+    let input100 = [Float](repeating: 0.3, count: 100)
+    processor.feedFarEnd(input100)
+    _ = processor.processNearEnd(input100)
+    // 150 - 128 = 22 pending
+    XCTAssertEqual(processor.pendingSampleCount, 22 + 384)
+  }
+
   // MARK: - Performance Tracking Tests
 
   func testPerformanceTrackingEnabled() throws {

@@ -393,6 +393,81 @@ public final class DTLNAecEchoProcessor {
     return outputSamples
   }
 
+  /// Number of samples buffered but not yet output.
+  /// This includes pending samples waiting to form a complete frame (0-127 samples)
+  /// plus the overlap-add tail (384 samples).
+  public var pendingSampleCount: Int {
+    let overlapTail = Self.blockLen - Self.blockShift  // 384
+    return pendingMicSamples.count + overlapTail
+  }
+
+  /// Flush remaining buffered audio at end of recording.
+  ///
+  /// When a recording ends, there may be samples that haven't been output yet:
+  /// - Pending samples (0-127) waiting for enough samples to form a frame
+  /// - Overlap-add tail (384 samples) from previous frame processing
+  ///
+  /// This method processes any pending samples (zero-padded if needed) and returns
+  /// all remaining buffered audio. Total output is up to 511 samples (~32ms at 16kHz).
+  ///
+  /// - Note: LSTM states are NOT reset by this method, preserving session continuity.
+  ///   Call `resetStates()` separately if starting a new recording session.
+  ///
+  /// - Returns: Remaining buffered audio samples (pending + overlap-add tail)
+  public func flush() -> [Float] {
+    guard isInitialized else {
+      let samples = pendingMicSamples
+      pendingMicSamples.removeAll(keepingCapacity: true)
+      pendingLoopbackSamples.removeAll(keepingCapacity: true)
+      return samples
+    }
+
+    var outputSamples: [Float] = []
+
+    // Process any pending samples by zero-padding to blockShift boundary
+    if !pendingMicSamples.isEmpty || !pendingLoopbackSamples.isEmpty {
+      // Pad mic samples to blockShift
+      let micPadCount = Self.blockShift - pendingMicSamples.count
+      if micPadCount > 0 {
+        pendingMicSamples.append(contentsOf: [Float](repeating: 0, count: micPadCount))
+      }
+
+      // Pad loopback samples to blockShift
+      let lpbPadCount = Self.blockShift - pendingLoopbackSamples.count
+      if lpbPadCount > 0 {
+        pendingLoopbackSamples.append(contentsOf: [Float](repeating: 0, count: lpbPadCount))
+      }
+
+      // Process the padded frame through normal path
+      shiftAndAppend(
+        buffer: &micBuffer, newSamples: Array(pendingMicSamples.prefix(Self.blockShift)))
+      shiftAndAppend(
+        buffer: &loopbackBuffer, newSamples: Array(pendingLoopbackSamples.prefix(Self.blockShift)))
+
+      pendingMicSamples.removeAll(keepingCapacity: true)
+      pendingLoopbackSamples.removeAll(keepingCapacity: true)
+
+      if let processed = processFrame(mic: micBuffer, loopback: loopbackBuffer) {
+        let frameOutput = overlapAdd(processed)
+        outputSamples.append(contentsOf: frameOutput)
+      } else {
+        let frameOutput = overlapAdd(micBuffer)
+        outputSamples.append(contentsOf: frameOutput)
+      }
+    }
+
+    // Extract the overlap-add tail (first 384 samples that haven't been output yet)
+    let overlapTail = Self.blockLen - Self.blockShift
+    outputSamples.append(contentsOf: outputBuffer.prefix(overlapTail))
+
+    // Zero the output buffer (but don't reset LSTM states)
+    for i in 0..<Self.blockLen {
+      outputBuffer[i] = 0
+    }
+
+    return outputSamples
+  }
+
   /// Python-style buffer shift: shift left by blockShift and add new samples at end
   private func shiftAndAppend(buffer: inout [Float], newSamples: [Float]) {
     // Shift left by blockShift (remove first 128, leaving 384)
