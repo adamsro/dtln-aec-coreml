@@ -27,8 +27,9 @@ Frames per model: 125 (1.0 seconds of audio)
 
 | Model | Params | Load    | Avg     | P99     | RT Ratio | Status |
 |-------|--------|---------|---------|---------|----------|--------|
-| 128   | 1.8M   |   474ms |  0.76ms |  1.95ms |   0.09x  | ✅     |
-| 512   | 10.4M  |   687ms |  1.43ms |  2.91ms |   0.18x  | ✅     |
+| 128   | 1.8M   |   448ms |  0.36ms |  1.58ms |   0.04x  | ✅     |
+| 256   | 3.9M   |   509ms |  0.59ms |  2.79ms |   0.07x  | ✅     |
+| 512   | 10.4M  |   604ms |  1.01ms |  4.45ms |   0.13x  | ✅     |
 
 Real-time requirement: <8ms per frame
 ```
@@ -109,12 +110,12 @@ Example GitHub Actions step:
 
 ### Expected Performance
 
-| Device | 128 units | 512 units |
-|--------|-----------|-----------|
-| M1 Mac | ~0.8ms | ~1.4ms |
-| M2 Mac | ~0.6ms | ~1.1ms |
-| iPhone 14 | ~0.9ms | ~1.6ms |
-| iPhone 12 | ~1.2ms | ~2.1ms |
+| Device | 128 units | 256 units | 512 units |
+|--------|-----------|-----------|-----------|
+| M1 Mac | ~0.4ms | ~0.6ms | ~1.0ms |
+| M2 Mac | ~0.3ms | ~0.5ms | ~0.8ms |
+| iPhone 14 | ~0.4ms | ~0.7ms | ~1.1ms |
+| iPhone 12 | ~0.6ms | ~0.9ms | ~1.5ms |
 
 *Actual results vary based on thermal state and system load.*
 

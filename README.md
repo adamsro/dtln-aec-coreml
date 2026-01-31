@@ -8,7 +8,7 @@ This package provides a Swift wrapper for [DTLN-aec](https://github.com/breizhn/
 
 ## Features
 
-- Real-time echo cancellation on Apple Silicon (~0.8ms per 8ms frame on M1)
+- Real-time echo cancellation on Apple Silicon (~0.4ms per 8ms frame on M1)
 - Three model sizes: 128 units (~7 MB), 256 units (~15 MB), 512 units (~40 MB)
 - **Separate model packages** - only bundle the model size you need
 - Modern Swift API with async/await support
@@ -89,9 +89,9 @@ try processor.loadModels(from: DTLNAec512.bundle)
 
 | Model | Units | Parameters | Bundle Size | Latency (M1) | Use Case |
 |-------|-------|------------|-------------|--------------|----------|
-| `.small` | 128 | 1.8M | ~7 MB | 0.8ms | Low latency, good quality |
-| `.medium` | 256 | 3.9M | ~15 MB | 0.9ms | Balanced |
-| `.large` | 512 | 10.4M | ~40 MB | 1.4ms | Best quality |
+| `.small` | 128 | 1.8M | ~7 MB | 0.4ms | Low latency, good quality |
+| `.medium` | 256 | 3.9M | ~15 MB | 0.6ms | Balanced |
+| `.large` | 512 | 10.4M | ~40 MB | 1.0ms | Best quality |
 
 All models run well within real-time requirements (8ms per frame).
 
@@ -155,8 +155,9 @@ Sample output on Apple M1:
 ```
 | Model | Params | Load    | Avg     | P99     | RT Ratio | Status |
 |-------|--------|---------|---------|---------|----------|--------|
-| 128   | 1.8M   |   474ms |  0.76ms |  1.95ms |   0.09x  | ✅     |
-| 512   | 10.4M  |   687ms |  1.43ms |  2.91ms |   0.18x  | ✅     |
+| 128   | 1.8M   |   448ms |  0.36ms |  1.58ms |   0.04x  | ✅     |
+| 256   | 3.9M   |   509ms |  0.59ms |  2.79ms |   0.07x  | ✅     |
+| 512   | 10.4M  |   604ms |  1.01ms |  4.45ms |   0.13x  | ✅     |
 ```
 
 ## Testing Echo Cancellation

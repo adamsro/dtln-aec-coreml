@@ -13,9 +13,9 @@
 // - LSTM states: [1, 2, units, 2] (2 layers, N units, h/c states)
 //
 // Available model sizes:
-// - 128 units: 1.8M params, ~0.8ms/frame on M1
-// - 256 units: 3.9M params, ~0.9ms/frame on M1
-// - 512 units: 10.4M params, ~1.4ms/frame on M1
+// - 128 units: 1.8M params, ~0.4ms/frame on M1
+// - 256 units: 3.9M params, ~0.6ms/frame on M1
+// - 512 units: 10.4M params, ~1.0ms/frame on M1
 
 import Accelerate
 import CoreML
@@ -155,6 +155,7 @@ public final class DTLNAecEchoProcessor {
   private var window: [Float]
   private var fftRealBuffer: [Float]  // Size: blockLen/2 for packed real FFT
   private var fftImagBuffer: [Float]  // Size: blockLen/2 for packed real FFT
+  private var magnitudeSquaredBuffer: [Float]  // Size: fftBins for vDSP magnitude calculation
 
   // MARK: - Preallocated MLMultiArrays
 
@@ -188,6 +189,11 @@ public final class DTLNAecEchoProcessor {
     // For packed real FFT, buffers are half the block size
     fftRealBuffer = [Float](repeating: 0, count: Self.blockLen / 2)
     fftImagBuffer = [Float](repeating: 0, count: Self.blockLen / 2)
+    // For vDSP magnitude calculation
+    magnitudeSquaredBuffer = [Float](repeating: 0, count: Self.fftBins)
+    // Ring buffers for pending samples (O(1) operations)
+    pendingMicRing = RingBuffer(capacity: Self.ringBufferCapacity)
+    pendingLoopbackRing = RingBuffer(capacity: Self.ringBufferCapacity)
     // log2n = 9 for 512-point real FFT
     fftSetup = vDSP_create_fftsetup(vDSP_Length(9), FFTRadix(kFFTRadix2))
   }
@@ -332,10 +338,72 @@ public final class DTLNAecEchoProcessor {
     totalProcessingTimeMs = 0
   }
 
-  // MARK: - Pending Sample Buffers (for Python-style sliding window)
+  // MARK: - Pending Sample Ring Buffers (O(1) append/remove)
 
-  private var pendingMicSamples: [Float] = []
-  private var pendingLoopbackSamples: [Float] = []
+  /// Fixed-capacity ring buffer for O(1) sample operations
+  private struct RingBuffer {
+    private var storage: [Float]
+    private var readIndex: Int = 0
+    private var writeIndex: Int = 0
+    private(set) var count: Int = 0
+    let capacity: Int
+
+    init(capacity: Int) {
+      self.capacity = capacity
+      self.storage = [Float](repeating: 0, count: capacity)
+    }
+
+    mutating func append(contentsOf samples: [Float]) {
+      for sample in samples {
+        storage[writeIndex] = sample
+        writeIndex = (writeIndex + 1) % capacity
+        if count < capacity {
+          count += 1
+        } else {
+          // Overwrite oldest - move read index
+          readIndex = (readIndex + 1) % capacity
+        }
+      }
+    }
+
+    mutating func removeFirst(_ n: Int) {
+      let removeCount = min(n, count)
+      readIndex = (readIndex + removeCount) % capacity
+      count -= removeCount
+    }
+
+    func prefix(_ n: Int) -> [Float] {
+      let takeCount = min(n, count)
+      var result = [Float](repeating: 0, count: takeCount)
+      for i in 0..<takeCount {
+        result[i] = storage[(readIndex + i) % capacity]
+      }
+      return result
+    }
+
+    var isEmpty: Bool { count == 0 }
+
+    mutating func removeAll(keepingCapacity: Bool = false) {
+      readIndex = 0
+      writeIndex = 0
+      count = 0
+    }
+  }
+
+  // Ring buffers with 4096 sample capacity (~256ms at 16kHz)
+  private static let ringBufferCapacity = 4096
+  private var pendingMicRing: RingBuffer
+  private var pendingLoopbackRing: RingBuffer
+
+  // Legacy accessors for compatibility
+  private var pendingMicSamples: RingBuffer {
+    get { pendingMicRing }
+    set { pendingMicRing = newValue }
+  }
+  private var pendingLoopbackSamples: RingBuffer {
+    get { pendingLoopbackRing }
+    set { pendingLoopbackRing = newValue }
+  }
 
   // MARK: - Public API
 
@@ -416,7 +484,7 @@ public final class DTLNAecEchoProcessor {
   /// - Returns: Remaining buffered audio samples (pending + overlap-add tail)
   public func flush() -> [Float] {
     guard isInitialized else {
-      let samples = pendingMicSamples
+      let samples = pendingMicSamples.prefix(pendingMicSamples.count)
       pendingMicSamples.removeAll(keepingCapacity: true)
       pendingLoopbackSamples.removeAll(keepingCapacity: true)
       return samples
@@ -470,17 +538,27 @@ public final class DTLNAecEchoProcessor {
 
   /// Python-style buffer shift: shift left by blockShift and add new samples at end
   private func shiftAndAppend(buffer: inout [Float], newSamples: [Float]) {
-    // Shift left by blockShift (remove first 128, leaving 384)
-    for i in 0..<(Self.blockLen - Self.blockShift) {
-      buffer[i] = buffer[i + Self.blockShift]
+    let overlapCount = Self.blockLen - Self.blockShift  // 384
+    // Use memmove-style bulk copy instead of element-by-element loop
+    buffer.withUnsafeMutableBufferPointer { ptr in
+      ptr.baseAddress!.update(from: ptr.baseAddress! + Self.blockShift, count: overlapCount)
     }
     // Add new samples at end (last 128 positions)
-    for i in 0..<min(newSamples.count, Self.blockShift) {
-      buffer[Self.blockLen - Self.blockShift + i] = newSamples[i]
+    let copyCount = min(newSamples.count, Self.blockShift)
+    if copyCount > 0 {
+      newSamples.withUnsafeBufferPointer { srcPtr in
+        buffer.withUnsafeMutableBufferPointer { dstPtr in
+          dstPtr.baseAddress!.advanced(by: overlapCount)
+            .update(from: srcPtr.baseAddress!, count: copyCount)
+        }
+      }
     }
     // Zero-fill if newSamples is shorter than blockShift
-    for i in newSamples.count..<Self.blockShift {
-      buffer[Self.blockLen - Self.blockShift + i] = 0
+    if copyCount < Self.blockShift {
+      buffer.withUnsafeMutableBufferPointer { ptr in
+        ptr.baseAddress!.advanced(by: overlapCount + copyCount)
+          .update(repeating: 0, count: Self.blockShift - copyCount)
+      }
     }
   }
 
@@ -551,11 +629,16 @@ public final class DTLNAecEchoProcessor {
       )
     }
 
-    // Pack real samples for vDSP real FFT: realp[i] = samples[2*i], imagp[i] = samples[2*i+1]
+    // Pack real samples for vDSP real FFT using stride-based copy
     let halfLen = Self.blockLen / 2
-    for i in 0..<halfLen {
-      fftRealBuffer[i] = samples[2 * i]
-      fftImagBuffer[i] = samples[2 * i + 1]
+    samples.withUnsafeBufferPointer { srcPtr in
+      fftRealBuffer.withUnsafeMutableBufferPointer { realPtr in
+        fftImagBuffer.withUnsafeMutableBufferPointer { imagPtr in
+          // Copy even indices to real, odd indices to imag (stride 2)
+          vDSP_vsadd(srcPtr.baseAddress!, 2, [Float](repeating: 0, count: 1), realPtr.baseAddress!, 1, vDSP_Length(halfLen))
+          vDSP_vsadd(srcPtr.baseAddress! + 1, 2, [Float](repeating: 0, count: 1), imagPtr.baseAddress!, 1, vDSP_Length(halfLen))
+        }
+      }
     }
 
     var magnitude = [Float](repeating: 0, count: Self.fftBins)
@@ -572,16 +655,29 @@ public final class DTLNAecEchoProcessor {
         magnitude[0] = abs(realPtr[0])
         phase[0] = realPtr[0] >= 0 ? 0 : .pi
 
-        // Bins 1 to fftBins-2 (indices 1..255)
-        for i in 1..<(Self.fftBins - 1) {
-          magnitude[i] = sqrt(realPtr[i] * realPtr[i] + imagPtr[i] * imagPtr[i])
-          phase[i] = atan2(imagPtr[i], realPtr[i])
-        }
-
         // Nyquist bin (index fftBins-1 = 256) - stored in imagp[0], purely real
         magnitude[Self.fftBins - 1] = abs(imagPtr[0])
         phase[Self.fftBins - 1] = imagPtr[0] >= 0 ? 0 : .pi
+
+        // Bins 1 to fftBins-2 (indices 1..255) - use vDSP for magnitude
+        // Create a view of bins 1..255 as a split complex
+        var midSplit = DSPSplitComplex(realp: realPtr.baseAddress! + 1, imagp: imagPtr.baseAddress! + 1)
+        magnitude.withUnsafeMutableBufferPointer { magPtr in
+          // Calculate squared magnitudes: real^2 + imag^2
+          vDSP_zvmags(&midSplit, 1, magPtr.baseAddress! + 1, 1, vDSP_Length(Self.fftBins - 2))
+        }
+
+        // Phase for bins 1..255 still needs atan2
+        for i in 1..<(Self.fftBins - 1) {
+          phase[i] = atan2(imagPtr[i], realPtr[i])
+        }
       }
+    }
+
+    // Take sqrt of squared magnitudes for bins 1..255
+    var sqrtCount = Int32(Self.fftBins - 2)
+    magnitude.withUnsafeMutableBufferPointer { magPtr in
+      vvsqrtf(magPtr.baseAddress! + 1, magPtr.baseAddress! + 1, &sqrtCount)
     }
 
     // vDSP real FFT scales by 2, compensate to match NumPy rfft
@@ -594,11 +690,16 @@ public final class DTLNAecEchoProcessor {
   {
     guard let fftSetup else { return micSamples }
 
-    // Pack real samples for vDSP real FFT
+    // Pack real samples for vDSP real FFT using stride-based copy
     let halfLen = Self.blockLen / 2
-    for i in 0..<halfLen {
-      fftRealBuffer[i] = micSamples[2 * i]
-      fftImagBuffer[i] = micSamples[2 * i + 1]
+    micSamples.withUnsafeBufferPointer { srcPtr in
+      fftRealBuffer.withUnsafeMutableBufferPointer { realPtr in
+        fftImagBuffer.withUnsafeMutableBufferPointer { imagPtr in
+          // Copy even indices to real, odd indices to imag (stride 2)
+          vDSP_vsadd(srcPtr.baseAddress!, 2, [Float](repeating: 0, count: 1), realPtr.baseAddress!, 1, vDSP_Length(halfLen))
+          vDSP_vsadd(srcPtr.baseAddress! + 1, 2, [Float](repeating: 0, count: 1), imagPtr.baseAddress!, 1, vDSP_Length(halfLen))
+        }
+      }
     }
 
     var output = [Float](repeating: 0, count: Self.blockLen)
@@ -638,10 +739,10 @@ public final class DTLNAecEchoProcessor {
         // Inverse real FFT - vDSP handles conjugate symmetry internally
         vDSP_fft_zrip(fftSetup, &splitComplex, 1, vDSP_Length(9), FFTDirection(FFT_INVERSE))
 
-        // Unpack: output[2*i] = realp[i], output[2*i+1] = imagp[i]
-        for i in 0..<halfLen {
-          output[2 * i] = realPtr[i]
-          output[2 * i + 1] = imagPtr[i]
+        // Unpack using stride-based copy: output[2*i] = realp[i], output[2*i+1] = imagp[i]
+        output.withUnsafeMutableBufferPointer { outPtr in
+          vDSP_vsadd(realPtr.baseAddress!, 1, [Float](repeating: 0, count: 1), outPtr.baseAddress!, 2, vDSP_Length(halfLen))
+          vDSP_vsadd(imagPtr.baseAddress!, 1, [Float](repeating: 0, count: 1), outPtr.baseAddress! + 1, 2, vDSP_Length(halfLen))
         }
       }
     }
@@ -658,11 +759,12 @@ public final class DTLNAecEchoProcessor {
     vDSP.add(outputBuffer, frame, result: &outputBuffer)
     let output = Array(outputBuffer.prefix(Self.blockShift))
 
-    for i in 0..<(Self.blockLen - Self.blockShift) {
-      outputBuffer[i] = outputBuffer[i + Self.blockShift]
-    }
-    for i in (Self.blockLen - Self.blockShift)..<Self.blockLen {
-      outputBuffer[i] = 0
+    let overlapCount = Self.blockLen - Self.blockShift  // 384
+    // Use memmove-style bulk copy instead of element-by-element loop
+    outputBuffer.withUnsafeMutableBufferPointer { ptr in
+      ptr.baseAddress!.update(from: ptr.baseAddress! + Self.blockShift, count: overlapCount)
+      // Zero the tail
+      ptr.baseAddress!.advanced(by: overlapCount).update(repeating: 0, count: Self.blockShift)
     }
 
     return output
