@@ -142,9 +142,11 @@ public final class DTLNAecEchoProcessor {
   private var states2: MLMultiArray?
 
   // MARK: - Audio Buffers
+  // Python-style: Fixed-size sliding windows, pre-initialized with zeros
+  // This provides smooth startup matching the TFLite reference behavior
 
-  private var micBuffer: [Float] = []
-  private var loopbackBuffer: [Float] = []
+  private var micBuffer: [Float]
+  private var loopbackBuffer: [Float]
   private var outputBuffer: [Float]
 
   // MARK: - FFT Setup (Accelerate vDSP)
@@ -177,6 +179,9 @@ public final class DTLNAecEchoProcessor {
   /// - Parameter config: The configuration for this processor
   public init(config: DTLNAecConfig) {
     self.config = config
+    // Python-style: Pre-fill buffers with zeros for smooth startup
+    micBuffer = [Float](repeating: 0, count: Self.blockLen)
+    loopbackBuffer = [Float](repeating: 0, count: Self.blockLen)
     outputBuffer = [Float](repeating: 0, count: Self.blockLen)
     window = [Float](repeating: 0, count: Self.blockLen)
     vDSP_hann_window(&window, vDSP_Length(Self.blockLen), Int32(vDSP_HANN_NORM))
@@ -317,12 +322,20 @@ public final class DTLNAecEchoProcessor {
       }
     }
 
-    micBuffer.removeAll(keepingCapacity: true)
-    loopbackBuffer.removeAll(keepingCapacity: true)
+    // Python-style: Reset to fixed-size zero-filled buffers
+    micBuffer = [Float](repeating: 0, count: Self.blockLen)
+    loopbackBuffer = [Float](repeating: 0, count: Self.blockLen)
     outputBuffer = [Float](repeating: 0, count: Self.blockLen)
+    pendingMicSamples.removeAll(keepingCapacity: true)
+    pendingLoopbackSamples.removeAll(keepingCapacity: true)
     framesProcessed = 0
     totalProcessingTimeMs = 0
   }
+
+  // MARK: - Pending Sample Buffers (for Python-style sliding window)
+
+  private var pendingMicSamples: [Float] = []
+  private var pendingLoopbackSamples: [Float] = []
 
   // MARK: - Public API
 
@@ -330,12 +343,7 @@ public final class DTLNAecEchoProcessor {
   /// Call this BEFORE processNearEnd for proper echo reference.
   /// - Parameter samples: Audio samples at 16kHz, Float format
   public func feedFarEnd(_ samples: [Float]) {
-    loopbackBuffer.append(contentsOf: samples)
-
-    let maxSamples = 8000  // ~500ms buffer
-    if loopbackBuffer.count > maxSamples {
-      loopbackBuffer.removeFirst(loopbackBuffer.count - maxSamples)
-    }
+    pendingLoopbackSamples.append(contentsOf: samples)
   }
 
   /// Process near-end (microphone) samples and return echo-cancelled output.
@@ -348,25 +356,33 @@ public final class DTLNAecEchoProcessor {
       return samples
     }
 
-    micBuffer.append(contentsOf: samples)
+    pendingMicSamples.append(contentsOf: samples)
     var outputSamples: [Float] = []
 
-    while micBuffer.count >= Self.blockLen && loopbackBuffer.count >= Self.blockLen {
+    // Process in blockShift (128 sample) chunks - Python style
+    while pendingMicSamples.count >= Self.blockShift
+      && pendingLoopbackSamples.count >= Self.blockShift
+    {
       let frameStart = Date()
 
-      let micFrame = Array(micBuffer.prefix(Self.blockLen))
-      let loopbackFrame = Array(loopbackBuffer.prefix(Self.blockLen))
+      // Python-style sliding window: shift left and add new samples at end
+      // micBuffer and loopbackBuffer are always exactly blockLen (512) samples
+      shiftAndAppend(
+        buffer: &micBuffer, newSamples: Array(pendingMicSamples.prefix(Self.blockShift)))
+      shiftAndAppend(
+        buffer: &loopbackBuffer, newSamples: Array(pendingLoopbackSamples.prefix(Self.blockShift)))
 
-      if let processed = processFrame(mic: micFrame, loopback: loopbackFrame) {
+      pendingMicSamples.removeFirst(Self.blockShift)
+      pendingLoopbackSamples.removeFirst(Self.blockShift)
+
+      // Process the current 512-sample window
+      if let processed = processFrame(mic: micBuffer, loopback: loopbackBuffer) {
         let frameOutput = overlapAdd(processed)
         outputSamples.append(contentsOf: frameOutput)
       } else {
-        let frameOutput = overlapAdd(micFrame)
+        let frameOutput = overlapAdd(micBuffer)
         outputSamples.append(contentsOf: frameOutput)
       }
-
-      micBuffer.removeFirst(Self.blockShift)
-      loopbackBuffer.removeFirst(Self.blockShift)
 
       if config.enablePerformanceTracking {
         framesProcessed += 1
@@ -375,6 +391,22 @@ public final class DTLNAecEchoProcessor {
     }
 
     return outputSamples
+  }
+
+  /// Python-style buffer shift: shift left by blockShift and add new samples at end
+  private func shiftAndAppend(buffer: inout [Float], newSamples: [Float]) {
+    // Shift left by blockShift (remove first 128, leaving 384)
+    for i in 0..<(Self.blockLen - Self.blockShift) {
+      buffer[i] = buffer[i + Self.blockShift]
+    }
+    // Add new samples at end (last 128 positions)
+    for i in 0..<min(newSamples.count, Self.blockShift) {
+      buffer[Self.blockLen - Self.blockShift + i] = newSamples[i]
+    }
+    // Zero-fill if newSamples is shorter than blockShift
+    for i in newSamples.count..<Self.blockShift {
+      buffer[Self.blockLen - Self.blockShift + i] = 0
+    }
   }
 
   /// Get average frame processing time in milliseconds

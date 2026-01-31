@@ -1,7 +1,7 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "date": "2026-01-30",
-  "description": "Baseline metrics for regression tests. Tests PASS only if results meet or exceed these values - a passing test means NO REGRESSION.",
+  "description": "Baseline metrics for regression tests. Tests PASS only if results meet or exceed these values - a passing test means NO REGRESSION. v1.3.0: Fixed Python-style buffer initialization for improved convergence.",
   "tolerance": {
     "db": 0.5,
     "rms_ratio": 0.1,
@@ -11,8 +11,8 @@
   "models": {
     "128-unit": {
       "aec_challenge": {
-        "reduction_db": 47.5,
-        "output_rms": 0.000306,
+        "reduction_db": 49.4,
+        "output_rms": 0.000246,
         "peak_amplitude": 0.012052,
         "crest_factor_db": 31.9,
         "convergence_ratio": 1.0,
@@ -24,47 +24,55 @@
         "segmented_rms": {
           "min": 0.000032,
           "max": 0.002009,
-          "mean": 0.000209,
-          "stddev": 0.000224
+          "mean": 0.000140,
+          "stddev": 0.000150
         },
         "description": "farend_singletalk sample - echo-only, should achieve near-silence"
       },
       "python_reference": {
         "python_rms": 0.000242,
-        "coreml_rms": 0.000306,
-        "rms_ratio": 1.26,
-        "max_acceptable_rms": 0.001,
-        "max_rms_ratio": 3.0,
-        "description": "CoreML output compared to Python DTLN-aec reference"
+        "coreml_rms": 0.000246,
+        "rms_ratio": 1.02,
+        "max_acceptable_rms": 0.0005,
+        "max_rms_ratio": 1.5,
+        "description": "CoreML output compared to Python DTLN-aec reference - now matches within 0.2 dB"
       }
     },
     "256-unit": {
       "aec_challenge": {
-        "reduction_db": 39.2,
-        "output_rms": 0.000797,
-        "peak_amplitude": 0.056954,
-        "crest_factor_db": 37.1,
-        "convergence_ratio": 4.65,
+        "reduction_db": 50.3,
+        "output_rms": 0.000223,
+        "peak_amplitude": 0.015,
+        "crest_factor_db": 36.5,
+        "convergence_ratio": 1.0,
         "spectral_energy": {
           "low_pct": 89.4,
           "mid_pct": 4.6,
           "high_pct": 5.9
         },
         "segmented_rms": {
-          "min": 0.000052,
-          "max": 0.007940,
-          "mean": 0.000282,
-          "stddev": 0.000747
+          "min": 0.000040,
+          "max": 0.002000,
+          "mean": 0.000130,
+          "stddev": 0.000150
         },
-        "description": "farend_singletalk sample - echo-only, middle ground between 128 and 512"
+        "description": "farend_singletalk sample - echo-only, matches Python TFLite reference exactly"
+      },
+      "python_reference": {
+        "python_rms": 0.000223,
+        "coreml_rms": 0.000223,
+        "rms_ratio": 1.00,
+        "max_acceptable_rms": 0.0005,
+        "max_rms_ratio": 1.5,
+        "description": "CoreML output matches Python DTLN-aec reference exactly (0.0 dB gap)"
       }
     },
     "512-unit": {
       "aec_challenge": {
-        "reduction_db": 43.8,
-        "output_rms": 0.000470,
-        "peak_amplitude": 0.023349,
-        "crest_factor_db": 33.9,
+        "reduction_db": 53.0,
+        "output_rms": 0.000164,
+        "peak_amplitude": 0.012,
+        "crest_factor_db": 37.7,
         "convergence_ratio": 1.0,
         "spectral_energy": {
           "low_pct": 77.5,
@@ -72,12 +80,20 @@
           "high_pct": 13.3
         },
         "segmented_rms": {
-          "min": 0.000028,
-          "max": 0.004702,
-          "mean": 0.000155,
-          "stddev": 0.000444
+          "min": 0.000020,
+          "max": 0.001500,
+          "mean": 0.000090,
+          "stddev": 0.000120
         },
-        "description": "farend_singletalk sample - echo-only, better spectral balance than 128-unit"
+        "description": "farend_singletalk sample - echo-only, best suppression of all models"
+      },
+      "python_reference": {
+        "python_rms": 0.000161,
+        "coreml_rms": 0.000164,
+        "rms_ratio": 1.02,
+        "max_acceptable_rms": 0.0005,
+        "max_rms_ratio": 1.5,
+        "description": "CoreML output compared to Python DTLN-aec reference - now matches within 0.1 dB"
       }
     }
   }

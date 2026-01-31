@@ -166,16 +166,16 @@ final class DTLNAecTests: XCTestCase {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
     try processor.loadModelsFromPackage()
 
-    // Feed exactly one block's worth of samples
-    let blockLen = DTLNAecEchoProcessor.blockLen
-    let input = [Float](repeating: 0.5, count: blockLen)
+    // Feed one block shift (128 samples) - the minimum processable chunk
+    let blockShift = DTLNAecEchoProcessor.blockShift
+    let input = [Float](repeating: 0.5, count: blockShift)
 
     processor.feedFarEnd(input)
     let output = processor.processNearEnd(input)
 
-    // Should produce output for one frame
+    // Should produce output for one frame (128 samples)
     XCTAssertGreaterThan(output.count, 0)
-    XCTAssertEqual(output.count, DTLNAecEchoProcessor.blockShift)
+    XCTAssertEqual(output.count, blockShift)
   }
 
   func testLongInput() throws {
