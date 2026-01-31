@@ -116,7 +116,7 @@ func printUsage() {
       --output <file>   Output WAV file path
 
     Options:
-      --model <size>    Model size: small, large (default)
+      --model <size>    Model size: small (128), medium (256), large (512, default)
       --help            Show this help message
 
     Example:
@@ -148,9 +148,10 @@ while let arg = args.popFirst() {
     if let size = args.popFirst() {
       switch size.lowercased() {
       case "small", "128": modelSize = .small
+      case "medium", "256": modelSize = .medium
       case "large", "512": modelSize = .large
       default:
-        print("Unknown model size: \(size). Use 'small' or 'large'.")
+        print("Unknown model size: \(size). Use 'small', 'medium', or 'large'.")
         exit(1)
       }
     }

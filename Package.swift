@@ -25,6 +25,8 @@ let package = Package(
       resources: [
         .copy("Resources/DTLN_AEC_128_Part1.mlpackage"),
         .copy("Resources/DTLN_AEC_128_Part2.mlpackage"),
+        .copy("Resources/DTLN_AEC_256_Part1.mlpackage"),
+        .copy("Resources/DTLN_AEC_256_Part2.mlpackage"),
         .copy("Resources/DTLN_AEC_512_Part1.mlpackage"),
         .copy("Resources/DTLN_AEC_512_Part2.mlpackage"),
       ]

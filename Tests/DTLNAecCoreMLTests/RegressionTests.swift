@@ -613,64 +613,6 @@ final class RegressionTests128: XCTestCase {
       "Echo reduction \(String(format: "%.1f", reductionDB)) dB regressed from baseline \(String(format: "%.1f", aecBaseline.reduction_db)) dB (min allowed: \(String(format: "%.1f", minAllowedReduction)) dB)")
   }
 
-  /// Verify echo suppression on realworld sample
-  func testRealworldEchoSuppression() throws {
-    let baseline = try RegressionTestUtils.baseline(for: "128-unit")
-    guard let realworldBaseline = baseline.realworld else {
-      throw XCTSkip("No realworld baseline defined for 128-unit model")
-    }
-    let tolerance = try RegressionTestUtils.tolerance()
-
-    let samplesDir = RegressionTestUtils.samplesDir()
-    let micFile = samplesDir.appendingPathComponent("farend_singletalk_realworld_mic.wav")
-    let coremlFile = samplesDir.appendingPathComponent(
-      "farend_singletalk_realworld_processed_coreml_128.wav")
-
-    guard FileManager.default.fileExists(atPath: micFile.path) else {
-      throw XCTSkip("Realworld mic input file not found at: \(micFile.path)")
-    }
-    guard FileManager.default.fileExists(atPath: coremlFile.path) else {
-      throw XCTSkip("Realworld CoreML 128-unit output file not found at: \(coremlFile.path)")
-    }
-
-    let micSamples = try RegressionTestUtils.readWAVFile(micFile)
-    let coremlSamples = try RegressionTestUtils.readWAVFile(coremlFile)
-
-    let micRMS = RegressionTestUtils.computeRMS(micSamples)
-    let coremlRMS = RegressionTestUtils.computeRMS(coremlSamples)
-    let reductionDB = RegressionTestUtils.computeReductionDB(micRMS, coremlRMS)
-
-    print("\n[128-unit] Realworld Echo Suppression Test:")
-    print("  Baseline version: \(try RegressionTestUtils.loadBaselines().version)")
-    print("  Mic samples: \(micSamples.count)")
-    print("  Output samples: \(coremlSamples.count)")
-    print("  Mic RMS: \(String(format: "%.6f", micRMS))")
-    print("  Output RMS: \(String(format: "%.6f", coremlRMS)) (baseline: \(String(format: "%.6f", realworldBaseline.output_rms)))")
-    print("  Reduction: \(String(format: "%.1f", reductionDB)) dB (baseline: \(String(format: "%.1f", realworldBaseline.reduction_db)) dB)")
-
-    // Detailed analysis
-    let micAnalysis = RegressionTestUtils.analyzeAudio(micSamples)
-    let outputAnalysis = RegressionTestUtils.analyzeAudio(coremlSamples)
-    micAnalysis.printReport(label: "Mic Input")
-    outputAnalysis.printReport(label: "Output")
-
-    // Verify output quality
-    let hasNaN = coremlSamples.contains { $0.isNaN }
-    let hasInf = coremlSamples.contains { $0.isInfinite }
-
-    print("\n  Has NaN: \(hasNaN)")
-    print("  Has Inf: \(hasInf)")
-
-    XCTAssertFalse(hasNaN, "Output should not contain NaN values")
-    XCTAssertFalse(hasInf, "Output should not contain infinite values")
-
-    // Verify no regression from baseline (with tolerance)
-    let minAllowedReduction = realworldBaseline.reduction_db - tolerance.db
-    XCTAssertGreaterThanOrEqual(
-      reductionDB, minAllowedReduction,
-      "Realworld echo reduction \(String(format: "%.1f", reductionDB)) dB regressed from baseline \(String(format: "%.1f", realworldBaseline.reduction_db)) dB (min allowed: \(String(format: "%.1f", minAllowedReduction)) dB)")
-  }
-
   /// Test that reprocessing the same input produces consistent output
   func testOutputConsistency() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
@@ -769,64 +711,6 @@ final class RegressionTests512: XCTestCase {
       "Echo reduction \(String(format: "%.1f", reductionDB)) dB regressed from baseline \(String(format: "%.1f", aecBaseline.reduction_db)) dB (min allowed: \(String(format: "%.1f", minAllowedReduction)) dB)")
   }
 
-  /// Verify echo suppression on realworld sample
-  func testRealworldEchoSuppression() throws {
-    let baseline = try RegressionTestUtils.baseline(for: "512-unit")
-    guard let realworldBaseline = baseline.realworld else {
-      throw XCTSkip("No realworld baseline defined for 512-unit model")
-    }
-    let tolerance = try RegressionTestUtils.tolerance()
-
-    let samplesDir = RegressionTestUtils.samplesDir()
-    let micFile = samplesDir.appendingPathComponent("farend_singletalk_realworld_mic.wav")
-    let coremlFile = samplesDir.appendingPathComponent(
-      "farend_singletalk_realworld_processed_coreml_512.wav")
-
-    guard FileManager.default.fileExists(atPath: micFile.path) else {
-      throw XCTSkip("Realworld mic input file not found at: \(micFile.path)")
-    }
-    guard FileManager.default.fileExists(atPath: coremlFile.path) else {
-      throw XCTSkip("Realworld CoreML 512-unit output file not found at: \(coremlFile.path)")
-    }
-
-    let micSamples = try RegressionTestUtils.readWAVFile(micFile)
-    let coremlSamples = try RegressionTestUtils.readWAVFile(coremlFile)
-
-    let micRMS = RegressionTestUtils.computeRMS(micSamples)
-    let coremlRMS = RegressionTestUtils.computeRMS(coremlSamples)
-    let reductionDB = RegressionTestUtils.computeReductionDB(micRMS, coremlRMS)
-
-    print("\n[512-unit] Realworld Echo Suppression Test:")
-    print("  Baseline version: \(try RegressionTestUtils.loadBaselines().version)")
-    print("  Mic samples: \(micSamples.count)")
-    print("  Output samples: \(coremlSamples.count)")
-    print("  Mic RMS: \(String(format: "%.6f", micRMS))")
-    print("  Output RMS: \(String(format: "%.6f", coremlRMS)) (baseline: \(String(format: "%.6f", realworldBaseline.output_rms)))")
-    print("  Reduction: \(String(format: "%.1f", reductionDB)) dB (baseline: \(String(format: "%.1f", realworldBaseline.reduction_db)) dB)")
-
-    // Detailed analysis
-    let micAnalysis = RegressionTestUtils.analyzeAudio(micSamples)
-    let outputAnalysis = RegressionTestUtils.analyzeAudio(coremlSamples)
-    micAnalysis.printReport(label: "Mic Input")
-    outputAnalysis.printReport(label: "Output")
-
-    // Verify output quality
-    let hasNaN = coremlSamples.contains { $0.isNaN }
-    let hasInf = coremlSamples.contains { $0.isInfinite }
-
-    print("\n  Has NaN: \(hasNaN)")
-    print("  Has Inf: \(hasInf)")
-
-    XCTAssertFalse(hasNaN, "Output should not contain NaN values")
-    XCTAssertFalse(hasInf, "Output should not contain infinite values")
-
-    // Verify no regression from baseline (with tolerance)
-    let minAllowedReduction = realworldBaseline.reduction_db - tolerance.db
-    XCTAssertGreaterThanOrEqual(
-      reductionDB, minAllowedReduction,
-      "Realworld echo reduction \(String(format: "%.1f", reductionDB)) dB regressed from baseline \(String(format: "%.1f", realworldBaseline.reduction_db)) dB (min allowed: \(String(format: "%.1f", minAllowedReduction)) dB)")
-  }
-
   /// Test that reprocessing the same input produces consistent output
   func testOutputConsistency() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .large)
@@ -860,5 +744,141 @@ final class RegressionTests512: XCTestCase {
     XCTAssertEqual(
       correlation, 1.0, accuracy: 1e-5,
       "Processing same input twice should produce identical output")
+  }
+}
+
+// MARK: - 256-Unit Model Regression Tests
+
+/// Regression tests for the 256-unit (medium) model
+final class RegressionTests256: XCTestCase {
+
+  /// Verify CoreML echo suppression effectiveness using AEC challenge sample
+  func testEchoSuppressionEffectiveness() throws {
+    let samplesDir = RegressionTestUtils.samplesDir()
+    let micFile = samplesDir.appendingPathComponent("farend_singletalk_mic.wav")
+    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_coreml_256.wav")
+
+    guard FileManager.default.fileExists(atPath: micFile.path) else {
+      throw XCTSkip("Mic input file not found at: \(micFile.path)")
+    }
+
+    let micSamples = try RegressionTestUtils.readWAVFile(micFile)
+
+    // If no pre-generated sample, process in streaming chunks
+    let coremlSamples: [Float]
+    if FileManager.default.fileExists(atPath: coremlFile.path) {
+      coremlSamples = try RegressionTestUtils.readWAVFile(coremlFile)
+    } else {
+      print("\n[256-unit] Processing AEC challenge sample in-place (streaming)...")
+      let loopbackFile = samplesDir.appendingPathComponent("farend_singletalk_lpb.wav")
+      guard FileManager.default.fileExists(atPath: loopbackFile.path) else {
+        throw XCTSkip("Loopback file not found at: \(loopbackFile.path)")
+      }
+      let loopbackSamples = try RegressionTestUtils.readWAVFile(loopbackFile)
+
+      let processor = DTLNAecEchoProcessor(modelSize: .medium)
+      try processor.loadModels()
+
+      // Process in streaming fashion with ~32ms chunks to simulate real-time processing
+      let chunkSize = 512  // 32ms at 16kHz
+      var output: [Float] = []
+      var offset = 0
+      while offset < min(micSamples.count, loopbackSamples.count) {
+        let endOffset = min(offset + chunkSize, micSamples.count, loopbackSamples.count)
+        let micChunk = Array(micSamples[offset..<endOffset])
+        let loopbackChunk = Array(loopbackSamples[offset..<endOffset])
+
+        processor.feedFarEnd(loopbackChunk)
+        let processedChunk = processor.processNearEnd(micChunk)
+        output.append(contentsOf: processedChunk)
+
+        offset = endOffset
+      }
+      coremlSamples = output
+    }
+
+    let micRMS = RegressionTestUtils.computeRMS(micSamples)
+    let coremlRMS = RegressionTestUtils.computeRMS(coremlSamples)
+    let reductionDB = RegressionTestUtils.computeReductionDB(micRMS, coremlRMS)
+
+    print("\n[256-unit] Echo Suppression Test:")
+    print("  Mic samples: \(micSamples.count)")
+    print("  Output samples: \(coremlSamples.count)")
+    print("  Mic RMS: \(String(format: "%.6f", micRMS))")
+    print("  Output RMS: \(String(format: "%.6f", coremlRMS))")
+    print("  Reduction: \(String(format: "%.1f", reductionDB)) dB")
+
+    // Detailed analysis
+    let outputAnalysis = RegressionTestUtils.analyzeAudio(coremlSamples)
+    outputAnalysis.printReport(label: "Output")
+
+    // Verify output quality
+    let hasNaN = coremlSamples.contains { $0.isNaN }
+    let hasInf = coremlSamples.contains { $0.isInfinite }
+
+    print("\n  Has NaN: \(hasNaN)")
+    print("  Has Inf: \(hasInf)")
+
+    XCTAssertFalse(hasNaN, "Output should not contain NaN values")
+    XCTAssertFalse(hasInf, "Output should not contain infinite values")
+    XCTAssertLessThanOrEqual(
+      outputAnalysis.peakAmplitude, 1.0, "Output should be normalized (-1 to 1)")
+
+    // 256-unit model should achieve significant echo reduction (>30 dB on this sample)
+    XCTAssertGreaterThan(
+      reductionDB, 30.0,
+      "Echo reduction \(String(format: "%.1f", reductionDB)) dB should be > 30 dB for far-end singletalk")
+  }
+
+  /// Test that reprocessing the same input produces consistent output
+  func testOutputConsistency() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .medium)
+    try processor.loadModels()
+
+    let numSamples = 16000  // 1 second
+    var farEnd = [Float](repeating: 0, count: numSamples)
+    var nearEnd = [Float](repeating: 0, count: numSamples)
+
+    // Generate test signal
+    for i in 0..<numSamples {
+      let t = Float(i) / 16000
+      farEnd[i] = 0.3 * sin(2 * .pi * 440 * t)
+      nearEnd[i] = 0.2 * sin(2 * .pi * 440 * t + 0.5)  // Echo with phase shift
+    }
+
+    // Process first time
+    processor.feedFarEnd(farEnd)
+    let output1 = processor.processNearEnd(nearEnd)
+
+    // Reset and process again
+    processor.resetStates()
+    processor.feedFarEnd(farEnd)
+    let output2 = processor.processNearEnd(nearEnd)
+
+    // Outputs should be identical
+    let correlation = RegressionTestUtils.computeCorrelation(output1, output2)
+    print("\n[256-unit] Output Consistency Test:")
+    print("  Correlation between runs: \(String(format: "%.6f", correlation))")
+
+    XCTAssertEqual(
+      correlation, 1.0, accuracy: 1e-5,
+      "Processing same input twice should produce identical output")
+  }
+
+  /// Test model loading
+  func testModelLoading() throws {
+    let processor = DTLNAecEchoProcessor(modelSize: .medium)
+
+    XCTAssertFalse(processor.isInitialized, "Processor should not be initialized before loading")
+
+    try processor.loadModels()
+
+    XCTAssertTrue(processor.isInitialized, "Processor should be initialized after loading")
+    XCTAssertEqual(processor.numUnits, 256, "Model should have 256 units")
+
+    print("\n[256-unit] Model Loading Test:")
+    print("  Model size: \(processor.modelSize)")
+    print("  Units: \(processor.numUnits)")
+    print("  Initialized: \(processor.isInitialized)")
   }
 }

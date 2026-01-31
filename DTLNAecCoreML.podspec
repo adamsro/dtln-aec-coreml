@@ -34,6 +34,8 @@ Pod::Spec.new do |s|
     'DTLNAecCoreML' => [
       'Sources/DTLNAecCoreML/Resources/DTLN_AEC_128_Part1.mlpackage',
       'Sources/DTLNAecCoreML/Resources/DTLN_AEC_128_Part2.mlpackage',
+      'Sources/DTLNAecCoreML/Resources/DTLN_AEC_256_Part1.mlpackage',
+      'Sources/DTLNAecCoreML/Resources/DTLN_AEC_256_Part2.mlpackage',
       'Sources/DTLNAecCoreML/Resources/DTLN_AEC_512_Part1.mlpackage',
       'Sources/DTLNAecCoreML/Resources/DTLN_AEC_512_Part2.mlpackage'
     ]
