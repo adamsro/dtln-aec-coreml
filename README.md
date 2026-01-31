@@ -107,6 +107,23 @@ The processing time adds negligibly on top of the algorithmic latency.
 - `DTLNAec256` for `.medium`
 - `DTLNAec512` for `.large`
 
+### Model Selection Guide
+
+Each model has different convergence characteristics due to LSTM state initialization:
+
+| Model | Convergence Time | Steady-State Suppression | Best For |
+|-------|------------------|--------------------------|----------|
+| `.small` (128) | ~1.0s | 49 dB | General use, balanced |
+| `.medium` (256) | ~0.3s | 50 dB | Fast convergence needed |
+| `.large` (512) | ~0.9s | 53 dB | Long audio, best quality |
+
+**Key insight:** Larger models have more LSTM hidden states that need time to stabilize. The 256-unit model hits a sweet spot with the fastest convergence, while 512-unit achieves the best steady-state suppression but takes longer to reach it.
+
+**Recommendations:**
+- For **short audio clips** (<2s): Use `.medium` (256) for fastest convergence
+- For **long audio/calls**: Use `.large` (512) for best overall suppression
+- For **low latency + small bundle**: Use `.small` (128) as a balanced choice
+
 ## Audio Requirements
 
 - **Sample rate:** 16,000 Hz
