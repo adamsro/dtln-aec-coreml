@@ -17,7 +17,7 @@ Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "1.0.0")
+    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "0.4.0-beta")
 ]
 ```
 
@@ -28,8 +28,8 @@ dependencies: [
 ```swift
 import DTLNAecCoreML
 
-// 1. Create the processor
-let processor = DTLNAecEchoProcessor(modelSize: .small)
+// 1. Create the processor (256-unit model recommended for most apps)
+let processor = DTLNAecEchoProcessor(modelSize: .medium)
 
 // 2. Load the models (do this once at startup)
 try processor.loadModels()
@@ -61,7 +61,7 @@ Load models without blocking the main thread:
 
 ```swift
 Task {
-    let processor = DTLNAecEchoProcessor(modelSize: .small)
+    let processor = DTLNAecEchoProcessor(modelSize: .medium)
     try await processor.loadModelsAsync()
     // Models are ready
 }
@@ -71,10 +71,11 @@ Task {
 
 | Model | Quality | Latency | Use Case |
 |-------|---------|---------|----------|
-| `.small` (128 units) | Good | ~0.8ms | Production apps, battery-constrained |
-| `.large` (512 units) | Best | ~1.4ms | Quality-critical applications |
+| `.small` (128 units) | Good | ~0.4ms | Minimal bundle size |
+| `.medium` (256 units) | Great | ~0.6ms | **Recommended for most apps** |
+| `.large` (512 units) | Best | ~1.0ms | Best quality for long audio |
 
-All models run well within the 8ms real-time budget.
+All models run well within the 8ms real-time budget. The 256-unit model is recommended for most applications due to its fast convergence (~0.3s) and excellent quality.
 
 ## What's Next?
 

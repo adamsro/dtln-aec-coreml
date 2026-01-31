@@ -23,16 +23,16 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "1.0.0")
+    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "0.4.0-beta")
 ],
 targets: [
     .target(
         name: "YourApp",
         dependencies: [
             "DTLNAecCoreML",   // Core processing code
-            "DTLNAec128",      // Small model (~7 MB) - pick one or more
-            // "DTLNAec256",   // Medium model (~15 MB)
-            // "DTLNAec512",   // Large model (~40 MB)
+            "DTLNAec256",      // Medium model (~15 MB) - recommended for most apps
+            // "DTLNAec128",   // Small model (~7 MB) - smaller bundle
+            // "DTLNAec512",   // Large model (~40 MB) - best quality
         ]
     )
 ]
@@ -44,13 +44,13 @@ Or in Xcode: File → Add Package Dependencies → Enter the repository URL, the
 
 ```swift
 import DTLNAecCoreML
-import DTLNAec128  // Import the model package you need
+import DTLNAec256  // Import the model package you need
 
 // Initialize processor
-let processor = DTLNAecEchoProcessor(modelSize: .small)
+let processor = DTLNAecEchoProcessor(modelSize: .medium)
 
 // Load CoreML models from the model package bundle
-try processor.loadModels(from: DTLNAec128.bundle)
+try processor.loadModels(from: DTLNAec256.bundle)
 
 // During audio processing:
 processor.feedFarEnd(systemAudioSamples)  // [Float] at 16kHz
@@ -113,16 +113,16 @@ Each model has different convergence characteristics due to LSTM state initializ
 
 | Model | Convergence Time | Steady-State Suppression | Best For |
 |-------|------------------|--------------------------|----------|
-| `.small` (128) | ~1.0s | 49 dB | General use, balanced |
-| `.medium` (256) | ~0.3s | 50 dB | Fast convergence needed |
-| `.large` (512) | ~0.9s | 53 dB | Long audio, best quality |
+| `.small` (128) | ~1.0s | 49 dB | Smallest bundle size |
+| `.medium` (256) | ~0.3s | 50 dB | **Recommended for most apps** |
+| `.large` (512) | ~0.9s | 53 dB | Best quality for long audio |
 
-**Key insight:** Larger models have more LSTM hidden states that need time to stabilize. The 256-unit model hits a sweet spot with the fastest convergence, while 512-unit achieves the best steady-state suppression but takes longer to reach it.
+**Key insight:** The 256-unit model hits a sweet spot with the fastest convergence (~0.3s) and excellent suppression (50 dB). This makes it ideal for most applications, including voice calls and short recordings.
 
 **Recommendations:**
-- For **short audio clips** (<2s): Use `.medium` (256) for fastest convergence
-- For **long audio/calls**: Use `.large` (512) for best overall suppression
-- For **low latency + small bundle**: Use `.small` (128) as a balanced choice
+- **Most applications**: Use `.medium` (256) - best balance of convergence speed, quality, and bundle size
+- For **long audio/podcasts**: Use `.large` (512) for best steady-state suppression
+- For **minimal bundle size**: Use `.small` (128) when binary size is critical
 
 ## Audio Requirements
 

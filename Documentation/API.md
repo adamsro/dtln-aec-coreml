@@ -104,6 +104,8 @@ public struct DTLNAecConfig: Sendable {
     var modelSize: DTLNAecModelSize
     var computeUnits: MLComputeUnits
     var enablePerformanceTracking: Bool
+    var validateNumerics: Bool
+    var clipOutput: Bool
 }
 ```
 
@@ -111,9 +113,11 @@ public struct DTLNAecConfig: Sendable {
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `modelSize` | `DTLNAecModelSize` | `.small` | Model variant to use |
+| `modelSize` | `DTLNAecModelSize` | `.small` | Model variant to use (`.medium` recommended) |
 | `computeUnits` | `MLComputeUnits` | `.cpuAndNeuralEngine` | CoreML compute units |
 | `enablePerformanceTracking` | `Bool` | `true` | Track `averageFrameTimeMs` |
+| `validateNumerics` | `Bool` | `true` | Check for NaN/Inf in model output |
+| `clipOutput` | `Bool` | `true` | Clamp output to [-1, 1] range |
 
 ### Compute Units
 
@@ -198,7 +202,7 @@ class AudioProcessor {
 
     init() {
         var config = DTLNAecConfig()
-        config.modelSize = .small
+        config.modelSize = .medium  // Recommended for most apps
         config.enablePerformanceTracking = true
 
         echoProcessor = DTLNAecEchoProcessor(config: config)
