@@ -95,6 +95,13 @@ try processor.loadModels(from: DTLNAec512.bundle)
 
 All models run well within real-time requirements (8ms per frame).
 
+### Understanding Latency
+
+- **Processing time** (shown above): How long the neural network takes to compute output for one 8ms frame. Since all models process in <2ms, they run comfortably faster than real-time.
+- **Algorithmic latency**: The inherent delay from buffering required by the STFT algorithm. DTLN-aec uses 512-sample frames at 16kHz, so the algorithmic latency is ~32ms (one STFT window).
+
+The processing time adds negligibly on top of the algorithmic latency.
+
 **Import the corresponding model package:**
 - `DTLNAec128` for `.small`
 - `DTLNAec256` for `.medium`
