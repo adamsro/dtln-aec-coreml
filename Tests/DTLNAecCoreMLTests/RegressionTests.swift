@@ -140,7 +140,7 @@ final class RegressionTests: XCTestCase {
 
     let samplesDir = packageRoot.appendingPathComponent("Samples/aec_challenge")
     let pythonFile = samplesDir.appendingPathComponent("farend_singletalk_processed_python.wav")
-    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_coreml.wav")
+    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_128.wav")
 
     guard FileManager.default.fileExists(atPath: pythonFile.path) else {
       throw XCTSkip("Python reference file not found")
@@ -194,7 +194,7 @@ final class RegressionTests: XCTestCase {
 
     let samplesDir = packageRoot.appendingPathComponent("Samples/aec_challenge")
     let micFile = samplesDir.appendingPathComponent("farend_singletalk_mic.wav")
-    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_coreml.wav")
+    let coremlFile = samplesDir.appendingPathComponent("farend_singletalk_processed_128.wav")
 
     // Check if files exist
     guard FileManager.default.fileExists(atPath: micFile.path) else {

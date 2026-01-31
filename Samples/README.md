@@ -12,8 +12,9 @@ Samples from the Microsoft AEC Challenge dataset.
 |------|-------------|
 | `farend_singletalk_lpb.wav` | Far-end (loopback) reference signal |
 | `farend_singletalk_mic.wav` | Microphone recording with echo |
-| `farend_singletalk_processed_python.wav` | Processed by original Python DTLN-aec |
-| `farend_singletalk_processed_coreml.wav` | Processed by this CoreML implementation |
+| `farend_singletalk_processed_python.wav` | Processed by original Python DTLN-aec (128-unit) |
+| `farend_singletalk_processed_128.wav` | Processed by CoreML 128-unit model (47.5 dB reduction) |
+| `farend_singletalk_processed_512.wav` | Processed by CoreML 512-unit model (43.8 dB reduction) |
 | `farend_singletalk_realworld_mic.wav` | Real speaker-to-mic recording using lpb |
 | `farend_singletalk_realworld_processed.wav` | Processed realworld recording |
 
@@ -29,12 +30,13 @@ Real-world recordings made by playing audio through speakers and recording with 
 
 ## Usage
 
-### Compare Python vs CoreML output
+### Compare outputs
 
 ```bash
-# Listen to both
-afplay Samples/aec_challenge/farend_singletalk_processed_python.wav
-afplay Samples/aec_challenge/farend_singletalk_processed_coreml.wav
+# Listen to Python reference vs CoreML outputs
+afplay Samples/aec_challenge/farend_singletalk_processed_python.wav  # Python 128-unit
+afplay Samples/aec_challenge/farend_singletalk_processed_128.wav     # CoreML 128-unit
+afplay Samples/aec_challenge/farend_singletalk_processed_512.wav     # CoreML 512-unit
 ```
 
 ### Process your own files
