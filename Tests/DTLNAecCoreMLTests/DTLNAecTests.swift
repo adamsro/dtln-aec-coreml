@@ -86,13 +86,13 @@ final class DTLNAecTests: XCTestCase {
 
   func testModelLoadingSmall() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
     XCTAssertTrue(processor.isInitialized)
   }
 
   func testModelLoadingLarge() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .large)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
     XCTAssertTrue(processor.isInitialized)
   }
 
@@ -100,7 +100,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testProcessingWithSyntheticData() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Generate synthetic test data
     let numSamples = 16000  // 1 second at 16kHz
@@ -139,7 +139,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testEmptyInput() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Feed empty arrays
     processor.feedFarEnd([])
@@ -151,7 +151,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testSmallInput() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Feed very small input (less than one block)
     let smallInput = [Float](repeating: 0.5, count: 64)
@@ -164,7 +164,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testMinimumBlockSize() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Feed exactly one block's worth of samples
     let blockLen = DTLNAecEchoProcessor.blockLen
@@ -180,7 +180,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testLongInput() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Process 10 seconds of audio
     let numSamples = 160000  // 10 seconds at 16kHz
@@ -198,7 +198,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testResetStates() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Process some data
     let input = [Float](repeating: 0.5, count: 1024)
@@ -219,7 +219,7 @@ final class DTLNAecTests: XCTestCase {
 
   func testResetDoesNotAffectModel() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Reset before processing
     processor.resetStates()
@@ -238,7 +238,7 @@ final class DTLNAecTests: XCTestCase {
     var config = DTLNAecConfig()
     config.enablePerformanceTracking = true
     let processor = DTLNAecEchoProcessor(config: config)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Process some data
     let input = [Float](repeating: 0.5, count: 1024)
@@ -253,7 +253,7 @@ final class DTLNAecTests: XCTestCase {
     var config = DTLNAecConfig()
     config.enablePerformanceTracking = false
     let processor = DTLNAecEchoProcessor(config: config)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     // Process some data
     let input = [Float](repeating: 0.5, count: 1024)
@@ -285,8 +285,8 @@ final class DTLNAecTests: XCTestCase {
     let smallProcessor = DTLNAecEchoProcessor(modelSize: .small)
     let largeProcessor = DTLNAecEchoProcessor(modelSize: .large)
 
-    try smallProcessor.loadModels()
-    try largeProcessor.loadModels()
+    try smallProcessor.loadModelsFromPackage()
+    try largeProcessor.loadModelsFromPackage()
 
     XCTAssertTrue(smallProcessor.isInitialized)
     XCTAssertTrue(largeProcessor.isInitialized)
@@ -298,7 +298,7 @@ final class DTLNAecTests: XCTestCase {
   func testLargeModelCPUOnly() throws {
     let config = DTLNAecConfig(modelSize: .large, computeUnits: .cpuOnly)
     let processor = DTLNAecEchoProcessor(config: config)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let numSamples = 16000  // 1 second
     var farEnd = [Float](repeating: 0, count: numSamples)
@@ -339,7 +339,7 @@ final class DTLNAecTests: XCTestCase {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
     XCTAssertFalse(processor.isInitialized)
 
-    try await processor.loadModelsAsync()
+    try await processor.loadModelsFromPackageAsync()
 
     XCTAssertTrue(processor.isInitialized)
   }

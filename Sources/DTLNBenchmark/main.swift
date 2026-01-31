@@ -1,6 +1,9 @@
 // DTLN-aec CoreML Benchmark
 // Measures latency of echo cancellation models on Apple Silicon
 
+import DTLNAec128
+import DTLNAec256
+import DTLNAec512
 import DTLNAecCoreML
 import Foundation
 
@@ -46,7 +49,13 @@ struct Benchmark {
       // Measure model loading time
       let loadStart = Date()
       do {
-        try processor.loadModels()
+        let bundle: Bundle
+        switch modelSize {
+        case .small: bundle = DTLNAec128.bundle
+        case .medium: bundle = DTLNAec256.bundle
+        case .large: bundle = DTLNAec512.bundle
+        }
+        try processor.loadModels(from: bundle)
       } catch {
         print("❌ Failed to load model: \(error)")
         print("   Make sure the model files are in the bundle.")

@@ -134,6 +134,7 @@ public final class DTLNAecEchoProcessor {
 
   private var modelPart1: MLModel?
   private var modelPart2: MLModel?
+  private var modelBundle: Bundle?
 
   // MARK: - LSTM States (persist across frames)
 
@@ -200,8 +201,10 @@ public final class DTLNAecEchoProcessor {
 
   /// Load CoreML models from bundle.
   /// Call this before processing audio.
+  /// - Parameter bundle: The bundle containing model resources. If nil, searches module and main bundles.
   /// - Throws: `DTLNAecError.modelNotFound` if models are not in the bundle
-  public func loadModels() throws {
+  public func loadModels(from bundle: Bundle? = nil) throws {
+    self.modelBundle = bundle
     let startTime = Date()
 
     let part1Name = "\(modelSize.modelNamePrefix)_Part1"
@@ -232,13 +235,14 @@ public final class DTLNAecEchoProcessor {
 
   /// Asynchronously load CoreML models from bundle.
   /// This performs model compilation on a background thread to avoid blocking the main thread.
+  /// - Parameter bundle: The bundle containing model resources. If nil, searches module and main bundles.
   /// - Throws: `DTLNAecError.modelNotFound` if models are not in the bundle
   @available(macOS 10.15, iOS 13.0, *)
-  public func loadModelsAsync() async throws {
+  public func loadModelsAsync(from bundle: Bundle? = nil) async throws {
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       DispatchQueue.global(qos: .userInitiated).async {
         do {
-          try self.loadModels()
+          try self.loadModels(from: bundle)
           continuation.resume()
         } catch {
           continuation.resume(throwing: error)
@@ -248,18 +252,20 @@ public final class DTLNAecEchoProcessor {
   }
 
   private func findAndCompileModel(name: String) throws -> URL? {
-    // Check for pre-compiled model
-    if let url = Bundle.main.url(forResource: name, withExtension: "mlmodelc") {
-      return url
+    // Check provided model bundle first (for split model packages)
+    if let bundle = modelBundle {
+      if let url = bundle.url(forResource: name, withExtension: "mlmodelc") {
+        return url
+      }
+      if let url = bundle.url(forResource: name, withExtension: "mlpackage") {
+        logger.info("Compiling \(name).mlpackage...")
+        return try MLModel.compileModel(at: url)
+      }
     }
 
-    // Check module bundle (SPM)
-    if let url = Bundle.module.url(forResource: name, withExtension: "mlmodelc") {
+    // Check for pre-compiled model in main bundle
+    if let url = Bundle.main.url(forResource: name, withExtension: "mlmodelc") {
       return url
-    }
-    if let url = Bundle.module.url(forResource: name, withExtension: "mlpackage") {
-      logger.info("Compiling \(name).mlpackage...")
-      return try MLModel.compileModel(at: url)
     }
 
     // Check main bundle for mlpackage

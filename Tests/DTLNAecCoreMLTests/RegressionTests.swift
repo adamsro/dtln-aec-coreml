@@ -629,7 +629,7 @@ final class RegressionTests128: XCTestCase {
   /// Test that reprocessing the same input produces consistent output
   func testOutputConsistency() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let numSamples = 16000  // 1 second
     var farEnd = [Float](repeating: 0, count: numSamples)
@@ -727,7 +727,7 @@ final class RegressionTests512: XCTestCase {
   /// Test that reprocessing the same input produces consistent output
   func testOutputConsistency() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .large)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let numSamples = 16000  // 1 second
     var farEnd = [Float](repeating: 0, count: numSamples)
@@ -790,7 +790,7 @@ final class RegressionTests256: XCTestCase {
       let loopbackSamples = try RegressionTestUtils.readWAVFile(loopbackFile)
 
       let processor = DTLNAecEchoProcessor(modelSize: .medium)
-      try processor.loadModels()
+      try processor.loadModelsFromPackage()
 
       // Process in streaming fashion with ~32ms chunks to simulate real-time processing
       let chunkSize = 512  // 32ms at 16kHz
@@ -846,7 +846,7 @@ final class RegressionTests256: XCTestCase {
   /// Test that reprocessing the same input produces consistent output
   func testOutputConsistency() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .medium)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let numSamples = 16000  // 1 second
     var farEnd = [Float](repeating: 0, count: numSamples)
@@ -884,7 +884,7 @@ final class RegressionTests256: XCTestCase {
 
     XCTAssertFalse(processor.isInitialized, "Processor should not be initialized before loading")
 
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     XCTAssertTrue(processor.isInitialized, "Processor should be initialized after loading")
     XCTAssertEqual(processor.numUnits, 256, "Model should have 256 units")

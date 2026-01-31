@@ -13,7 +13,7 @@ final class AECQualityTests: XCTestCase {
   /// Expected: output should be significantly attenuated
   func testPureEchoScenario() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let duration: Float = 2.0  // 2 seconds
     let numSamples = Int(Self.sampleRate * duration)
@@ -59,7 +59,7 @@ final class AECQualityTests: XCTestCase {
   /// Uses chunked processing for realistic behavior
   func testEchoWithNearEndTalker() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let duration: Float = 3.0
     let numSamples = Int(Self.sampleRate * duration)
@@ -141,7 +141,7 @@ final class AECQualityTests: XCTestCase {
   /// Test with varying echo delays
   func testVaryingEchoDelays() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let delays: [Float] = [10, 30, 50, 100, 150]  // milliseconds
     let duration: Float = 1.0
@@ -182,7 +182,7 @@ final class AECQualityTests: XCTestCase {
   /// Test with broadband noise as far-end (more realistic)
   func testBroadbandEcho() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let duration: Float = 2.0
     let numSamples = Int(Self.sampleRate * duration)
@@ -220,7 +220,7 @@ final class AECQualityTests: XCTestCase {
   /// Double-talk scenario: simultaneous far-end and near-end
   func testDoubleTalk() throws {
     let processor = DTLNAecEchoProcessor(modelSize: .small)
-    try processor.loadModels()
+    try processor.loadModelsFromPackage()
 
     let duration: Float = 2.0
     let numSamples = Int(Self.sampleRate * duration)

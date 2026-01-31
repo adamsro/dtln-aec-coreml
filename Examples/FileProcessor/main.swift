@@ -12,6 +12,9 @@
 //      .executableTarget(name: "FileProcessor", dependencies: ["DTLNAecCoreML"], path: "Examples/FileProcessor")
 //   2. Run: swift run FileProcessor --help
 
+import DTLNAec128
+import DTLNAec256
+import DTLNAec512
 import DTLNAecCoreML
 import Foundation
 
@@ -204,7 +207,13 @@ print("Loading DTLN-aec model (\(modelSize.units) units)...")
 let processor = DTLNAecEchoProcessor(modelSize: modelSize)
 
 do {
-  try processor.loadModels()
+  let bundle: Bundle
+  switch modelSize {
+  case .small: bundle = DTLNAec128.bundle
+  case .medium: bundle = DTLNAec256.bundle
+  case .large: bundle = DTLNAec512.bundle
+  }
+  try processor.loadModels(from: bundle)
   print("  Model loaded successfully")
 } catch {
   print("Error loading model: \(error)")

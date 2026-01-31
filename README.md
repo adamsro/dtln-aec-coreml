@@ -9,7 +9,8 @@ This package provides a Swift wrapper for [DTLN-aec](https://github.com/breizhn/
 ## Features
 
 - Real-time echo cancellation on Apple Silicon (~0.8ms per 8ms frame on M1)
-- Two model sizes: 128 units (small) and 512 units (large)
+- Three model sizes: 128 units (~7 MB), 256 units (~15 MB), 512 units (~40 MB)
+- **Separate model packages** - only bundle the model size you need
 - Modern Swift API with async/await support
 - Configurable compute units (CPU, GPU, Neural Engine)
 - iOS 16+ and macOS 13+ support
@@ -23,21 +24,33 @@ Add to your `Package.swift`:
 ```swift
 dependencies: [
     .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "YourApp",
+        dependencies: [
+            "DTLNAecCoreML",   // Core processing code
+            "DTLNAec128",      // Small model (~7 MB) - pick one or more
+            // "DTLNAec256",   // Medium model (~15 MB)
+            // "DTLNAec512",   // Large model (~40 MB)
+        ]
+    )
 ]
 ```
 
-Or in Xcode: File → Add Package Dependencies → Enter the repository URL.
+Or in Xcode: File → Add Package Dependencies → Enter the repository URL, then select which products to include.
 
 ## Quick Start
 
 ```swift
 import DTLNAecCoreML
+import DTLNAec128  // Import the model package you need
 
 // Initialize processor
 let processor = DTLNAecEchoProcessor(modelSize: .small)
 
-// Load CoreML models (do this once at startup)
-try processor.loadModels()
+// Load CoreML models from the model package bundle
+try processor.loadModels(from: DTLNAec128.bundle)
 
 // During audio processing:
 processor.feedFarEnd(systemAudioSamples)  // [Float] at 16kHz
@@ -50,29 +63,42 @@ processor.resetStates()
 ### Async Model Loading
 
 ```swift
-let processor = DTLNAecEchoProcessor(modelSize: .small)
-try await processor.loadModelsAsync()  // Non-blocking
+import DTLNAecCoreML
+import DTLNAec512
+
+let processor = DTLNAecEchoProcessor(modelSize: .large)
+try await processor.loadModelsAsync(from: DTLNAec512.bundle)  // Non-blocking
 ```
 
 ### Configuration Options
 
 ```swift
+import DTLNAecCoreML
+import DTLNAec512
+
 var config = DTLNAecConfig()
 config.modelSize = .large                    // Best quality
 config.computeUnits = .cpuAndNeuralEngine   // Use Neural Engine
 config.enablePerformanceTracking = true
 
 let processor = DTLNAecEchoProcessor(config: config)
+try processor.loadModels(from: DTLNAec512.bundle)
 ```
 
 ## Model Sizes
 
-| Model | Units | Parameters | Size | Latency (M1) | Use Case |
-|-------|-------|------------|------|--------------|----------|
-| `.small` | 128 | 1.8M | 3.6 MB | 0.76ms | Low latency, good quality |
-| `.large` | 512 | 10.4M | 20.3 MB | 1.43ms | Best quality (recommended) |
+| Model | Units | Parameters | Bundle Size | Latency (M1) | Use Case |
+|-------|-------|------------|-------------|--------------|----------|
+| `.small` | 128 | 1.8M | ~7 MB | 0.8ms | Low latency, good quality |
+| `.medium` | 256 | 3.9M | ~15 MB | 0.9ms | Balanced |
+| `.large` | 512 | 10.4M | ~40 MB | 1.4ms | Best quality |
 
 All models run well within real-time requirements (8ms per frame).
+
+**Import the corresponding model package:**
+- `DTLNAec128` for `.small`
+- `DTLNAec256` for `.medium`
+- `DTLNAec512` for `.large`
 
 ## Audio Requirements
 
