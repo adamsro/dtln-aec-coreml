@@ -15,10 +15,10 @@ Pod::Spec.new do |s|
     - Separate subspecs for each model size to minimize app bundle size
   DESC
 
-  s.homepage         = 'https://github.com/anthropics/dtln-aec-coreml'
+  s.homepage         = 'https://github.com/MimicScribe/dtln-aec-coreml'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.author           = { 'Anthropic' => 'support@anthropic.com' }
-  s.source           = { :git => 'https://github.com/anthropics/dtln-aec-coreml.git', :tag => s.version.to_s }
+  s.author           = { 'MimicScribe' => 'https://mimicscribe.app' }
+  s.source           = { :git => 'https://github.com/MimicScribe/dtln-aec-coreml.git', :tag => s.version.to_s }
 
   s.ios.deployment_target = '16.0'
   s.osx.deployment_target = '13.0'

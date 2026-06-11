@@ -1,6 +1,13 @@
 # DTLN-aec CoreML
 
-[![CI](https://github.com/adamsro/dtln-aec-coreml/actions/workflows/ci.yml/badge.svg)](https://github.com/adamsro/dtln-aec-coreml/actions/workflows/ci.yml)
+[![CI](https://github.com/MimicScribe/dtln-aec-coreml/actions/workflows/ci.yml/badge.svg)](https://github.com/MimicScribe/dtln-aec-coreml/actions/workflows/ci.yml)
+
+> [!IMPORTANT]
+> **This repository is archived.** The package works as published, but we no longer use or maintain it.
+>
+> We replaced DTLN-aec in [MimicScribe](https://mimicscribe.app/) with [LocalVQE](https://huggingface.co/LocalAI-io/LocalVQE), an Apache-2.0 neural echo canceller that held up better in production. Three things drove the switch: LocalVQE has built-in mic/reference time alignment, where DTLN-aec depends on the caller pairing the two streams exactly; it tolerated the clock drift that real capture pipelines produce between the mic and the system-audio reference; and it runs on CPU via ggml, where in our testing these CoreML models would only run on the Neural Engine, which blocks headless use (CI, command-line tools).
+>
+> If you need acoustic echo cancellation on Apple platforms today, start with LocalVQE's C API. This package remains usable as-is if the CoreML path fits your constraints.
 
 > **Note:** This is a community port, not affiliated with the original DTLN-aec authors. While regression tests verify near-comparable performance, subtle differences from the TensorFlow implementation may exist.
 
@@ -29,7 +36,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "0.4.0-beta")
+    .package(url: "https://github.com/MimicScribe/dtln-aec-coreml.git", from: "0.4.0-beta")
 ],
 targets: [
     .target(

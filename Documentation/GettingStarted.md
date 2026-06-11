@@ -10,14 +10,14 @@ Add DTLNAecCoreML to your project using Xcode:
 
 1. Open your project in Xcode
 2. Go to **File → Add Package Dependencies**
-3. Enter the repository URL: `https://github.com/anthropics/dtln-aec-coreml.git`
+3. Enter the repository URL: `https://github.com/MimicScribe/dtln-aec-coreml.git`
 4. Select the version and click **Add Package**
 
 Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/anthropics/dtln-aec-coreml.git", from: "0.4.0-beta")
+    .package(url: "https://github.com/MimicScribe/dtln-aec-coreml.git", from: "0.4.0-beta")
 ]
 ```
 

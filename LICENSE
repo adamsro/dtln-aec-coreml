@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Anthropic
+Copyright (c) 2026 MimicScribe
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-DTLN-aec Model Weights License:
-
-The DTLN-aec model weights included in this package are from:
-https://github.com/breizhn/DTLN-aec
-
-Copyright (c) 2020 Nils L. Westhausen
-Licensed under the MIT License.
